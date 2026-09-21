@@ -1,0 +1,921 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-09-21",
+  "settings": {
+    "warning_days": 7,
+    "urgent_days": 3,
+    "important_days": 14,
+    "show_finished": false,
+    "carousel_limit": 0,
+    "sort_by_deadline": true
+  },
+  "conferences": [
+    {
+      "name": "USENIX Security 2027 Cycle 1",
+      "short_name": "USENIX'27 C1",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://www.usenix.org/conference/usenixsecurity27/call-for-papers",
+      "order": 10,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Registration",
+          "datetime": "2026-08-18 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-08-25 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Artifacts",
+          "datetime": "2026-08-28 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Early Reject",
+          "datetime": "2026-10-06 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Starts",
+          "datetime": "2026-11-05 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Ends",
+          "datetime": "2026-11-12 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-12-03 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Shepherd Approval",
+          "datetime": "2026-12-15 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Final Paper",
+          "datetime": "2027-01-14 23:59"
+        }
+      ]
+    },
+    {
+      "name": "USENIX Security 2027 Cycle 2",
+      "short_name": "USENIX'27 C2",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://www.usenix.org/conference/usenixsecurity27/call-for-papers",
+      "order": 11,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Registration",
+          "datetime": "2027-01-19 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2027-01-26 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Artifacts",
+          "datetime": "2027-01-29 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Early Reject",
+          "datetime": "2027-03-09 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Starts",
+          "datetime": "2027-04-08 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Ends",
+          "datetime": "2027-04-15 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2027-05-06 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Shepherd Approval",
+          "datetime": "2027-05-18 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Final Paper",
+          "datetime": "2027-06-03 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2027-08-11 23:59"
+        }
+      ]
+    },
+    {
+      "name": "ACM CCS 2026 Cycle A",
+      "short_name": "CCS'26 A",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://www.sigsac.org/ccs/CCS2026/call-for/call-for-papers.html",
+      "order": 20,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-01-07 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-01-14 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Early Reject",
+          "datetime": "2026-02-20 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Starts",
+          "datetime": "2026-03-17 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Ends",
+          "datetime": "2026-03-20 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-04-09 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Minor Revision",
+          "datetime": "2026-06-05 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Camera Ready",
+          "datetime": "2026-08-09 23:59"
+        }
+      ]
+    },
+    {
+      "name": "ACM CCS 2026 Cycle B",
+      "short_name": "CCS'26 B",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://www.sigsac.org/ccs/CCS2026/call-for/call-for-papers.html",
+      "order": 21,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-04-22 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-04-29 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Artifacts",
+          "datetime": "2026-05-02 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Early Reject",
+          "datetime": "2026-06-12 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Starts",
+          "datetime": "2026-06-29 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Ends",
+          "datetime": "2026-07-01 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-07-17 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Minor Revision",
+          "datetime": "2026-09-04 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Camera Ready",
+          "datetime": "2026-09-13 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2026-11-15 23:59"
+        }
+      ]
+    },
+    {
+      "name": "NDSS Symposium 2027 Summer Cycle",
+      "short_name": "NDSS'27 Sum",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://www.ndss-symposium.org/ndss2027/submissions/call-for-papers/",
+      "order": 30,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-05-06 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Round 2",
+          "datetime": "2026-06-18 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Starts",
+          "datetime": "2026-07-15 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Ends",
+          "datetime": "2026-07-17 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Discussion Ends",
+          "datetime": "2026-07-22 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-07-29 23:59"
+        },
+        {
+          "phase": "Revision",
+          "event": "Minor Revision",
+          "datetime": "2026-08-19 23:59"
+        },
+        {
+          "phase": "Revision",
+          "event": "Major Revision",
+          "datetime": "2026-08-31 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Revision Notify",
+          "datetime": "2026-09-16 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Camera Ready",
+          "datetime": "2026-09-30 23:59"
+        }
+      ]
+    },
+    {
+      "name": "NDSS Symposium 2027 Fall Cycle",
+      "short_name": "NDSS'27 Fall",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://www.ndss-symposium.org/ndss2027/submissions/call-for-papers/",
+      "order": 31,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-08-19 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Round 2",
+          "datetime": "2026-10-16 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Starts",
+          "datetime": "2026-11-11 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Ends",
+          "datetime": "2026-11-13 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Discussion Ends",
+          "datetime": "2026-11-18 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-11-24 23:59"
+        },
+        {
+          "phase": "Revision",
+          "event": "Revision Due",
+          "datetime": "2026-12-22 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Revision Notify",
+          "datetime": "2027-01-11 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Camera Ready",
+          "datetime": "2027-02-01 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2027-03-22 23:59"
+        }
+      ]
+    },
+    {
+      "name": "IEEE Symposium on Security and Privacy 2027 First Deadline",
+      "short_name": "S&P'27 D1",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://sp2027.ieee-security.org/cfpapers.html",
+      "order": 40,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-06-04 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-06-11 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Early Reject",
+          "datetime": "2026-07-27 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Reviews",
+          "datetime": "2026-08-20 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal",
+          "datetime": "2026-08-27 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Revision",
+          "datetime": "2026-09-03 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-09-11 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Shepherd",
+          "datetime": "2026-10-02 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Camera Ready",
+          "datetime": "2026-10-16 23:59"
+        }
+      ]
+    },
+    {
+      "name": "IEEE Symposium on Security and Privacy 2027 Second Deadline",
+      "short_name": "S&P'27 D2",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://sp2027.ieee-security.org/cfpapers.html",
+      "order": 41,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-11-10 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-11-17 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Early Reject",
+          "datetime": "2027-01-18 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Reviews",
+          "datetime": "2027-02-11 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal",
+          "datetime": "2027-02-16 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Interactive Starts",
+          "datetime": "2027-02-17 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Revision",
+          "datetime": "2027-02-26 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2027-03-05 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Shepherd",
+          "datetime": "2027-03-26 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Camera Ready",
+          "datetime": "2027-04-08 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2027-05-17 23:59"
+        }
+      ]
+    },
+    {
+      "name": "Conference on Neural Information Processing Systems 2026",
+      "short_name": "NeurIPS'26",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://neurips.cc/Conferences/2026/Dates",
+      "order": 50,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-05-04 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-05-06 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Reviews",
+          "datetime": "2026-07-22 23:59"
+        },
+        {
+          "phase": "Discussion",
+          "event": "Discussion Starts",
+          "datetime": "2026-07-27 23:59"
+        },
+        {
+          "phase": "Discussion",
+          "event": "Discussion Ends",
+          "datetime": "2026-08-03 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-09-24 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2026-12-06 23:59"
+        }
+      ]
+    },
+    {
+      "name": "International Conference on Learning Representations 2027",
+      "short_name": "ICLR'27",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://iclr.cc/Conferences/2027/Dates",
+      "order": 60,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-09-18 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-09-25 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Reviews",
+          "datetime": "2026-11-05 23:59"
+        },
+        {
+          "phase": "Discussion",
+          "event": "Discussion Ends",
+          "datetime": "2026-11-18 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-12-16 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2027-04-26 23:59"
+        }
+      ]
+    },
+    {
+      "name": "AAAI Conference on Artificial Intelligence 2027",
+      "short_name": "AAAI'27",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://aaai.org/conference/aaai/aaai-27/submission-instructions/",
+      "order": 70,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-07-21 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-07-28 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Supplement",
+          "datetime": "2026-07-31 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Phase 1 Reject",
+          "datetime": "2026-09-24 23:59"
+        },
+        {
+          "phase": "Feedback",
+          "event": "Feedback Starts",
+          "datetime": "2026-10-19 23:59"
+        },
+        {
+          "phase": "Feedback",
+          "event": "Feedback Ends",
+          "datetime": "2026-10-25 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-11-30 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Camera Ready",
+          "datetime": "2026-12-14 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2027-02-16 23:59"
+        }
+      ]
+    },
+    {
+      "name": "The ACM Web Conference 2027 Research Track",
+      "short_name": "WWW'27",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://www2027.thewebconf.org/research-track-papers/",
+      "order": 80,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-10-18 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-10-25 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Results",
+          "datetime": "2026-12-21 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Rebuttal Ends",
+          "datetime": "2026-12-31 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2027-01-04 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Final Version",
+          "datetime": "2027-01-31 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2027-05-10 23:59"
+        }
+      ]
+    },
+    {
+      "name": "International Conference on Machine Learning 2026",
+      "short_name": "ICML'26",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://icml.cc/Conferences/2026/Dates",
+      "order": 90,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-01-23 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-01-28 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Reviews",
+          "datetime": "2026-03-24 23:59"
+        },
+        {
+          "phase": "Response",
+          "event": "Author Response",
+          "datetime": "2026-03-30 23:59"
+        },
+        {
+          "phase": "Discussion",
+          "event": "Discussion Ends",
+          "datetime": "2026-04-07 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-04-30 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2026-07-06 23:59"
+        }
+      ]
+    },
+    {
+      "name": "International Conference on Software Engineering 2027 Research Track",
+      "short_name": "ICSE'27",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://conf.researchr.org/track/icse-2027/icse-2027-research-track",
+      "order": 100,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-06-23 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-06-30 23:59"
+        },
+        {
+          "phase": "Response",
+          "event": "Response Starts",
+          "datetime": "2026-09-23 23:59"
+        },
+        {
+          "phase": "Response",
+          "event": "Response Ends",
+          "datetime": "2026-09-25 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-10-20 23:59"
+        },
+        {
+          "phase": "Revision",
+          "event": "Revision Due",
+          "datetime": "2026-11-17 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Direct Camera",
+          "datetime": "2026-11-24 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Revision Decision",
+          "datetime": "2026-12-18 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Revision Camera",
+          "datetime": "2027-01-25 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2027-04-25 23:59"
+        }
+      ]
+    },
+    {
+      "name": "Automated Software Engineering 2026 Research Track",
+      "short_name": "ASE'26",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://conf.researchr.org/track/ase-2026/ase-2026-research-track",
+      "order": 110,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-03-26 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Early Reject",
+          "datetime": "2026-05-25 23:59"
+        },
+        {
+          "phase": "Response",
+          "event": "Response Ends",
+          "datetime": "2026-05-27 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Initial Notify",
+          "datetime": "2026-06-18 23:59"
+        },
+        {
+          "phase": "Revision",
+          "event": "Revision Due",
+          "datetime": "2026-07-16 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Final Notify",
+          "datetime": "2026-07-29 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Camera Ready",
+          "datetime": "2026-08-03 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2026-10-12 23:59"
+        }
+      ]
+    },
+    {
+      "name": "International Symposium on Software Testing and Analysis 2027",
+      "short_name": "ISSTA'27",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://conf.researchr.org/home/issta-2027",
+      "order": 120,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2027-01-08 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2027-01-11 23:59"
+        },
+        {
+          "phase": "Response",
+          "event": "Response Starts",
+          "datetime": "2027-03-22 23:59"
+        },
+        {
+          "phase": "Response",
+          "event": "Response Ends",
+          "datetime": "2027-03-25 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Initial Notify",
+          "datetime": "2027-04-20 23:59"
+        },
+        {
+          "phase": "Revision",
+          "event": "Revision Due",
+          "datetime": "2027-05-20 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Final Notify",
+          "datetime": "2027-06-17 23:59"
+        },
+        {
+          "phase": "Camera",
+          "event": "Camera Ready",
+          "datetime": "2027-07-22 23:59"
+        },
+        {
+          "phase": "Waiting",
+          "event": "Conf",
+          "datetime": "2027-09-07 23:59"
+        }
+      ]
+    },
+    {
+      "name": "IEEE International Conference on Computer Communications 2027",
+      "short_name": "INFOCOM'27",
+      "ccf_level": "A",
+      "visible": true,
+      "timezone": "AoE",
+      "url": "https://infocom2027.ieee-infocom.org/call-papers",
+      "order": 130,
+      "stages": [
+        {
+          "phase": "Submit",
+          "event": "Abstract",
+          "datetime": "2026-07-24 23:59"
+        },
+        {
+          "phase": "Submit",
+          "event": "Paper",
+          "datetime": "2026-07-31 23:59"
+        },
+        {
+          "phase": "Review",
+          "event": "Early Reject",
+          "datetime": "2026-10-09 23:59"
+        },
+        {
+          "phase": "Decision",
+          "event": "Notify",
+          "datetime": "2026-12-08 23:59"
+        }
+      ]
+    }
+  ]
+}
