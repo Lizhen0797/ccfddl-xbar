@@ -1,6 +1,6 @@
 #!/bin/bash
 # <xbar.title>CCF Conference Deadlines</xbar.title>
-# <xbar.version>3.0</xbar.version>
+# <xbar.version>3.1</xbar.version>
 # <xbar.author>OpenAI</xbar.author>
 # <xbar.desc>Rotating JSON-backed CCF conference deadlines with AoE/IANA timezone support and full timelines.</xbar.desc>
 # <xbar.dependencies>bash,jq</xbar.dependencies>
@@ -22,6 +22,7 @@ NOW_EPOCH="$(date +%s)"
 WARNING_DAYS=7
 URGENT_DAYS=3
 IMPORTANT_DAYS=14
+DISPLAY_LOCAL_TIME=true
 SHOW_FINISHED=false
 CAROUSEL_LIMIT=0   # 0 = rotate all active conferences
 SORT_BY_DEADLINE=true
@@ -113,6 +114,28 @@ bool_true() {
   esac
 }
 
+format_datetime() {
+  local epoch="$1"
+  local source_datetime="$2"
+  local source_timezone="$3"
+  local converted
+
+  if bool_true "$DISPLAY_LOCAL_TIME"; then
+    if is_gnu_date; then
+      converted="$(date -d "@$epoch" '+%Y-%m-%d %H:%M %Z' 2>/dev/null)"
+    else
+      converted="$(date -r "$epoch" '+%Y-%m-%d %H:%M %Z' 2>/dev/null)"
+    fi
+
+    if [ -n "$converted" ]; then
+      printf '%s' "$converted (local)"
+      return 0
+    fi
+  fi
+
+  printf '%s %s' "$source_datetime" "$(display_tz "$source_timezone")"
+}
+
 emit_error() {
   echo "⚠ CCF DDL"
   echo "---"
@@ -134,6 +157,8 @@ validate_config() {
     (.settings.warning_days | type == "number" and . >= 0 and floor == .) and
     (.settings.urgent_days | type == "number" and . >= 0 and floor == .) and
     (.settings.important_days | type == "number" and . >= 0 and floor == .) and
+    (((.settings | has("display_local_time")) == false) or
+      (.settings.display_local_time | type == "boolean")) and
     (.settings.show_finished | type == "boolean") and
     (.settings.carousel_limit | type == "number" and . >= 0 and floor == .) and
     (.settings.sort_by_deadline | type == "boolean") and
@@ -162,12 +187,13 @@ SETTINGS_LINE="$(jq -r '[
   .settings.warning_days,
   .settings.urgent_days,
   .settings.important_days,
+  (.settings | if has("display_local_time") then .display_local_time else true end),
   .settings.show_finished,
   .settings.carousel_limit,
   .settings.sort_by_deadline
 ] | @tsv' "$CONFIG_FILE")"
 
-IFS=$'\t' read -r WARNING_DAYS URGENT_DAYS IMPORTANT_DAYS SHOW_FINISHED CAROUSEL_LIMIT SORT_BY_DEADLINE <<EOF_SETTINGS
+IFS=$'\t' read -r WARNING_DAYS URGENT_DAYS IMPORTANT_DAYS DISPLAY_LOCAL_TIME SHOW_FINISHED CAROUSEL_LIMIT SORT_BY_DEADLINE <<EOF_SETTINGS
 $SETTINGS_LINE
 EOF_SETTINGS
 
@@ -227,11 +253,10 @@ flush_conf() {
     return 0
   fi
 
-  local full short ccf tz url
+  local full short ccf url
   full="$(sanitize_text "$CONF_FULL")"
   short="$(sanitize_text "$CONF_SHORT")"
   ccf="$(sanitize_text "$CONF_CCF")"
-  tz="$(display_tz "$CONF_TZ")"
   url="$CONF_URL"
 
   if [ "$NEXT_FOUND" = true ]; then
@@ -260,7 +285,7 @@ flush_conf() {
     fi
     printf '%s\n' "--Current: ${NEXT_STAGE}" >> "$DROPDOWN_FILE"
     printf '%s\n' "--Next: ${NEXT_EVENT}" >> "$DROPDOWN_FILE"
-    printf '%s\n' "--DDL: ${NEXT_DT} ${tz} · ${remain}" >> "$DROPDOWN_FILE"
+    printf '%s\n' "--DDL: ${NEXT_DT} · ${remain}" >> "$DROPDOWN_FILE"
     printf '%s\n' "--Timeline" >> "$DROPDOWN_FILE"
     while IFS= read -r tl; do
       printf '%s\n' "----${tl}" >> "$DROPDOWN_FILE"
@@ -312,19 +337,20 @@ EOF_FIELDS
         printf '%s\n' "⚠ Invalid date: $(sanitize_text "$event") · $(sanitize_text "$dt") $(display_tz "$CONF_TZ")" >> "$TIMELINE_TMP"
         continue
       fi
+      event_display="$(format_datetime "$event_epoch" "$dt" "$CONF_TZ")"
 
       if [ "$event_epoch" -le "$NOW_EPOCH" ]; then
-        printf '%s\n' "✓ $(sanitize_text "$event") · $(sanitize_text "$dt") $(display_tz "$CONF_TZ")" >> "$TIMELINE_TMP"
+        printf '%s\n' "✓ $(sanitize_text "$event") · $(sanitize_text "$event_display")" >> "$TIMELINE_TMP"
       else
         if [ "$NEXT_FOUND" = false ]; then
           NEXT_FOUND=true
           NEXT_STAGE="$(sanitize_text "$stage")"
           NEXT_EVENT="$(sanitize_text "$event")"
-          NEXT_DT="$(sanitize_text "$dt")"
+          NEXT_DT="$(sanitize_text "$event_display")"
           NEXT_EPOCH="$event_epoch"
-          printf '%s\n' "▶ $(sanitize_text "$event") · $(sanitize_text "$dt") $(display_tz "$CONF_TZ")" >> "$TIMELINE_TMP"
+          printf '%s\n' "▶ $(sanitize_text "$event") · $(sanitize_text "$event_display")" >> "$TIMELINE_TMP"
         else
-          printf '%s\n' "○ $(sanitize_text "$event") · $(sanitize_text "$dt") $(display_tz "$CONF_TZ")" >> "$TIMELINE_TMP"
+          printf '%s\n' "○ $(sanitize_text "$event") · $(sanitize_text "$event_display")" >> "$TIMELINE_TMP"
         fi
       fi
       ;;
@@ -357,6 +383,11 @@ echo "---"
 echo "CCF Conference Deadlines"
 echo "--Config: $(sanitize_text "$CONFIG_FILE")"
 echo "--Carousel window: ${IMPORTANT_DAYS} days"
+if bool_true "$DISPLAY_LOCAL_TIME"; then
+  echo "--Times: computer local timezone"
+else
+  echo "--Times: configured conference timezone"
+fi
 echo "--Refresh | refresh=true"
 echo "---"
 

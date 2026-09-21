@@ -10,6 +10,7 @@ A macOS [xbar](https://xbarapp.com/) plugin for tracking academic conference tim
 - Rotates only dates within a configurable importance window, which defaults to 14 days.
 - Lets each conference be shown or hidden independently with `visible`.
 - Supports AoE, UTC, and other IANA time zones.
+- Can automatically convert every conference event to the computer's local time zone.
 - Marks completed, current, and future timeline events automatically.
 - Uses red and orange colors for urgent and approaching dates.
 - Supports deadline-based or configured ordering and an optional carousel limit.
@@ -89,6 +90,7 @@ The configuration has the following top-level structure:
   "warning_days": 7,
   "urgent_days": 3,
   "important_days": 14,
+  "display_local_time": true,
   "show_finished": false,
   "carousel_limit": 0,
   "sort_by_deadline": true
@@ -100,6 +102,7 @@ The configuration has the following top-level structure:
 | `warning_days` | Non-negative integer | Show an approaching date in orange when its remaining time is within this threshold. |
 | `urgent_days` | Non-negative integer | Show an urgent date in red when its remaining time is within this threshold. |
 | `important_days` | Non-negative integer | Include a conference in the menu-bar carousel only when its next event is within this many days. |
+| `display_local_time` | Boolean | Convert configured conference times to the computer's local time zone when `true`. |
 | `show_finished` | Boolean | Keep conferences whose entire timeline has finished in the dropdown menu. |
 | `carousel_limit` | Non-negative integer | Maximum number of rotating entries; `0` means no additional limit. |
 | `sort_by_deadline` | Boolean | Use the next deadline when `true`; use each conference's `order` value when `false`. |
@@ -159,6 +162,30 @@ The script treats the first future event of each conference as its next event. T
 - `✓`: completed;
 - `▶`: the current next event;
 - `○`: a later event.
+
+### Local Time-Zone Conversion
+
+Conference dates remain stored in the time zone declared by each conference. With the default setting below, the plugin first interprets the configured wall-clock time in that source time zone and then displays the equivalent time in the computer's local time zone:
+
+```json
+"display_local_time": true
+```
+
+For example, an AoE deadline may be displayed as:
+
+```text
+2026-10-08 00:59 NZDT (local)
+```
+
+The operating system applies the appropriate UTC offset and daylight-saving rule for each event date. The output includes the local time-zone abbreviation and the `(local)` marker.
+
+To display the original configured date and time zone instead, use:
+
+```json
+"display_local_time": false
+```
+
+For backward compatibility, the script treats a configuration without `display_local_time` as if the value were `true`.
 
 ## Custom Configuration Path
 

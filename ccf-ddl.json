@@ -5,6 +5,7 @@
     "warning_days": 7,
     "urgent_days": 3,
     "important_days": 14,
+    "display_local_time": true,
     "show_finished": false,
     "carousel_limit": 0,
     "sort_by_deadline": true
