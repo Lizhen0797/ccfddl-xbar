@@ -28,6 +28,8 @@ WARNING_DAYS=7
 URGENT_DAYS=3
 IMPORTANT_DAYS=14
 DISPLAY_LOCAL_TIME=true
+SHOW_PHASE_IN_CAROUSEL=false
+SHOW_CCF_LEVEL=false
 SHOW_FINISHED=false
 CAROUSEL_LIMIT=0   # 0 = rotate all active conferences
 SORT_BY_DEADLINE=true
@@ -226,6 +228,10 @@ validate_config() {
     (.settings.important_days | type == "number" and . >= 0 and floor == .) and
     (((.settings | has("display_local_time")) == false) or
       (.settings.display_local_time | type == "boolean")) and
+    (((.settings | has("show_phase_in_carousel")) == false) or
+      (.settings.show_phase_in_carousel | type == "boolean")) and
+    (((.settings | has("show_ccf_level")) == false) or
+      (.settings.show_ccf_level | type == "boolean")) and
     (.settings.show_finished | type == "boolean") and
     (.settings.carousel_limit | type == "number" and . >= 0 and floor == .) and
     (.settings.sort_by_deadline | type == "boolean") and
@@ -268,12 +274,14 @@ SETTINGS_LINE="$(jq -r '[
   .settings.urgent_days,
   .settings.important_days,
   (.settings | if has("display_local_time") then .display_local_time else true end),
+  (.settings | if has("show_phase_in_carousel") then .show_phase_in_carousel else false end),
+  (.settings | if has("show_ccf_level") then .show_ccf_level else false end),
   .settings.show_finished,
   .settings.carousel_limit,
   .settings.sort_by_deadline
 ] | @tsv' "$CONFIG_FILE")"
 
-IFS=$'\t' read -r WARNING_DAYS URGENT_DAYS IMPORTANT_DAYS DISPLAY_LOCAL_TIME SHOW_FINISHED CAROUSEL_LIMIT SORT_BY_DEADLINE <<EOF_SETTINGS
+IFS=$'\t' read -r WARNING_DAYS URGENT_DAYS IMPORTANT_DAYS DISPLAY_LOCAL_TIME SHOW_PHASE_IN_CAROUSEL SHOW_CCF_LEVEL SHOW_FINISHED CAROUSEL_LIMIT SORT_BY_DEADLINE <<EOF_SETTINGS
 $SETTINGS_LINE
 EOF_SETTINGS
 
@@ -340,11 +348,18 @@ reset_conf() {
 flush_conf() {
   [ "$CONF_ACTIVE" = true ] || return 0
 
-  local full short url full_attribute next_visibility checked_parameter
+  local full short ccf conference_label url full_attribute next_visibility checked_parameter
   full="$(sanitize_text "$CONF_FULL")"
   short="$(sanitize_text "$CONF_SHORT")"
+  ccf="$(sanitize_text "$CONF_CCF")"
   url="$CONF_URL"
   full_attribute="$(swiftbar_escape_attribute "$full")"
+
+  if bool_true "$SHOW_CCF_LEVEL"; then
+    conference_label="[CCF-${ccf}] ${short}"
+  else
+    conference_label="$short"
+  fi
 
   if bool_true "$CONF_VISIBLE"; then
     next_visibility=false
@@ -353,7 +368,7 @@ flush_conf() {
     next_visibility=true
     checked_parameter=''
   fi
-  printf '%s\n' "--${short} | tooltip=\"${full_attribute}\" bash=\"${SCRIPT_ACTION_PATH}\" param1=--set-visible param2=${CONF_INDEX} param3=${next_visibility} terminal=false refresh=true${checked_parameter}" >> "$VISIBILITY_FILE"
+  printf '%s\n' "--${conference_label} | tooltip=\"${full_attribute}\" bash=\"${SCRIPT_ACTION_PATH}\" param1=--set-visible param2=${CONF_INDEX} param3=${next_visibility} terminal=false refresh=true${checked_parameter}" >> "$VISIBILITY_FILE"
 
   if ! bool_true "$CONF_VISIBLE"; then
     CONF_ACTIVE=false
@@ -365,7 +380,11 @@ flush_conf() {
     delta=$((NEXT_EPOCH - NOW_EPOCH))
     remain="$(remaining_text "$delta")"
     color="$(status_color "$delta")"
-    top_line="${short} · ${NEXT_EVENT} · ${remain}"
+    if bool_true "$SHOW_PHASE_IN_CAROUSEL"; then
+      top_line="${conference_label} · ${NEXT_STAGE}→${NEXT_EVENT} · ${remain}"
+    else
+      top_line="${conference_label} · ${NEXT_EVENT} · ${remain}"
+    fi
     epoch_key="$NEXT_EPOCH"
     important_secs=$((IMPORTANT_DAYS * 86400))
 
@@ -380,9 +399,9 @@ flush_conf() {
     fi
 
     if [ -n "$url" ]; then
-      printf '%s | href=%s tooltip="%s"\n' "$short" "$url" "$full_attribute" >> "$DROPDOWN_FILE"
+      printf '%s | href=%s tooltip="%s"\n' "$conference_label" "$url" "$full_attribute" >> "$DROPDOWN_FILE"
     else
-      printf '%s | tooltip="%s"\n' "$short" "$full_attribute" >> "$DROPDOWN_FILE"
+      printf '%s | tooltip="%s"\n' "$conference_label" "$full_attribute" >> "$DROPDOWN_FILE"
     fi
     printf '%s\n' "--Current: ${NEXT_STAGE}" >> "$DROPDOWN_FILE"
     printf '%s\n' "--Next: ${NEXT_EVENT}" >> "$DROPDOWN_FILE"
@@ -395,9 +414,9 @@ flush_conf() {
   else
     if bool_true "$SHOW_FINISHED"; then
       if [ -n "$url" ]; then
-        printf '%s | href=%s tooltip="%s"\n' "$short" "$url" "$full_attribute" >> "$DROPDOWN_FILE"
+        printf '%s | href=%s tooltip="%s"\n' "$conference_label" "$url" "$full_attribute" >> "$DROPDOWN_FILE"
       else
-        printf '%s | tooltip="%s"\n' "$short" "$full_attribute" >> "$DROPDOWN_FILE"
+        printf '%s | tooltip="%s"\n' "$conference_label" "$full_attribute" >> "$DROPDOWN_FILE"
       fi
       printf '%s\n' '--Status: finished' >> "$DROPDOWN_FILE"
       printf '%s\n' '--Timeline' >> "$DROPDOWN_FILE"

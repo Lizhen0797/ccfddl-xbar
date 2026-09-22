@@ -93,6 +93,8 @@ The configuration has the following top-level structure:
   "urgent_days": 3,
   "important_days": 14,
   "display_local_time": true,
+  "show_phase_in_carousel": false,
+  "show_ccf_level": false,
   "show_finished": false,
   "carousel_limit": 0,
   "sort_by_deadline": true
@@ -105,6 +107,8 @@ The configuration has the following top-level structure:
 | `urgent_days` | Non-negative integer | Show an urgent date in red when its remaining time is within this threshold. |
 | `important_days` | Non-negative integer | Include a conference in the menu-bar carousel only when its next event is within this many days. |
 | `display_local_time` | Boolean | Convert configured conference times to the computer's local time zone when `true`. |
+| `show_phase_in_carousel` | Boolean | Prefix the next event with its broader workflow phase in the menu-bar carousel when `true`. |
+| `show_ccf_level` | Boolean | Prefix conference abbreviations with their CCF level throughout the menu when `true`. |
 | `show_finished` | Boolean | Keep conferences whose entire timeline has finished in the dropdown menu. |
 | `carousel_limit` | Non-negative integer | Maximum number of rotating entries; `0` means no additional limit. |
 | `sort_by_deadline` | Boolean | Use the next deadline when `true`; use each conference's `order` value when `false`. |
@@ -159,7 +163,7 @@ Open the plugin menu and expand **Conference Visibility**. It always contains ev
 - click a checked conference to hide it;
 - click an unchecked conference to show it again.
 
-The visibility checklist and conference headings use only `short_name`, such as `NeurIPS'26` or `ICSE'27`, to keep the menu compact. The CCF level remains in the JSON configuration but is not repeated in the menu. Hover over an item to see its full conference name. Each click atomically updates that conference's `visible` value in the active JSON configuration and asks SwiftBar to refresh the plugin. The selector itself remains available even when every conference is hidden.
+The visibility checklist and conference headings use `short_name`, such as `NeurIPS'26` or `ICSE'27`, to keep the menu compact. Set `show_ccf_level` to `true` to prefix these labels with values such as `[CCF-A]`. Hover over an item to see its full conference name. Each click atomically updates that conference's `visible` value in the active JSON configuration and asks SwiftBar to refresh the plugin. The selector itself remains available even when every conference is hidden.
 
 ### Date-Only Time Convention
 
@@ -203,7 +207,7 @@ The script treats the first future event of each conference as its next event. T
 - `▶`: the current next event;
 - `○`: a later event.
 
-The menu-bar carousel shows only the conference abbreviation, the next event, and the remaining time, for example `NeurIPS'26 · Notification · 2d9h`. The broader workflow phase remains available as `Current` in the dropdown details. Remaining time is shown to hour precision: `2d9h` means two days and nine hours, `9h` means less than one day remains, and durations below one hour are shown in minutes.
+With `show_phase_in_carousel` set to `false`, the menu-bar carousel shows only the conference abbreviation, next event, and remaining time, for example `NeurIPS'26 · Notification · 2d9h`. Set it to `true` to show `NeurIPS'26 · Decision→Notification · 2d9h` instead. The broader workflow phase always remains available as `Current` in the dropdown details. Remaining time is shown to hour precision: `2d9h` means two days and nine hours, `9h` means less than one day remains, and durations below one hour are shown in minutes.
 
 ### Local Time-Zone Conversion
 
