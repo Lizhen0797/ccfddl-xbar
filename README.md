@@ -1,12 +1,13 @@
-# CCF Conference Deadlines for xbar
+# CCF Conference Deadlines for SwiftBar and xbar
 
-A macOS [xbar](https://xbarapp.com/) plugin for tracking academic conference timelines. It reads conference data from a JSON file, rotates upcoming important dates in the menu bar, and shows the full submission, review, rebuttal, notification, and camera-ready timeline in the dropdown menu.
+A macOS [SwiftBar](https://github.com/swiftbar/SwiftBar) and [xbar](https://xbarapp.com/) plugin for tracking academic conference timelines. It reads conference data from a JSON file, rotates upcoming important dates in the menu bar, and shows the full submission, review, rebuttal, notification, and camera-ready timeline in the dropdown menu.
 
 > **AI-generated project notice:** The Bash code, initial JSON configuration, and this README were generated and revised by OpenAI Codex from user requirements. AI-generated code and conference dates may contain errors. Review the implementation before use, and always confirm a deadline on the official conference website before submitting a paper.
 
 ## Features
 
 - Stores global settings, conferences, and timeline events in JSON.
+- Provides a SwiftBar checklist for showing or hiding every configured conference.
 - Rotates only dates within a configurable importance window, which defaults to 14 days.
 - Lets each conference be shown or hidden independently with `visible`.
 - Supports AoE, UTC, and other IANA time zones, including per-event overrides.
@@ -23,7 +24,7 @@ This project does not fetch conference information from the internet or update d
 
 ```text
 .
-├── ccf-ddl.1m.sh   # xbar plugin, executed once per minute
+├── ccf-ddl.1m.sh   # SwiftBar/xbar plugin, executed once per minute
 ├── ccf-ddl.json    # Settings, conferences, and timeline events
 └── README.md
 ```
@@ -31,7 +32,7 @@ This project does not fetch conference information from the internet or update d
 ## Requirements
 
 - macOS
-- [xbar](https://xbarapp.com/)
+- [SwiftBar](https://github.com/swiftbar/SwiftBar) or [xbar](https://xbarapp.com/)
 - Bash 3.2 or later
 - `jq`
 
@@ -41,7 +42,7 @@ Install `jq` with Homebrew:
 brew install jq
 ```
 
-## Installation
+## SwiftBar Installation
 
 1. Create the configuration directory and copy the JSON file:
 
@@ -50,17 +51,17 @@ brew install jq
    cp ccf-ddl.json "$HOME/.config/xbar/ccf-ddl.json"
    ```
 
-2. In xbar, select **Open Plugin Folder**, then copy `ccf-ddl.1m.sh` into the folder that opens.
+2. Open SwiftBar's configured **Plugin Folder**, then copy `ccf-ddl.1m.sh` into it.
 
 3. Make the plugin executable:
 
    ```bash
-   chmod +x "/path/to/xbar/plugins/ccf-ddl.1m.sh"
+   chmod +x "/path/to/SwiftBar/ccf-ddl.1m.sh"
    ```
 
-4. Refresh the plugins in xbar.
+4. Refresh the plugin in SwiftBar.
 
-The `.1m.` segment in the filename tells xbar to execute the plugin once per minute.
+The `.1m.` segment in the filename tells SwiftBar or xbar to execute the plugin once per minute. The output format remains compatible with xbar if you prefer to use it instead.
 
 You can also run the plugin directly from the repository:
 
@@ -149,6 +150,16 @@ When `visible` is `false`, the conference is removed from both the menu-bar caro
 ```json
 "visible": false
 ```
+
+### SwiftBar Conference Checklist
+
+Open the plugin menu and expand **Conference Visibility**. It always contains every conference in the JSON configuration:
+
+- a checked conference is shown in the menu-bar carousel and conference details;
+- click a checked conference to hide it;
+- click an unchecked conference to show it again.
+
+Each click atomically updates that conference's `visible` value in the active JSON configuration and asks SwiftBar to refresh the plugin. The selector itself remains available even when every conference is hidden.
 
 ### Date-Only Time Convention
 

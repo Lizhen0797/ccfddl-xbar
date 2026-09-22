@@ -1,14 +1,19 @@
 #!/bin/bash
 # <xbar.title>CCF Conference Deadlines</xbar.title>
-# <xbar.version>3.1</xbar.version>
+# <xbar.version>3.2</xbar.version>
 # <xbar.author>OpenAI</xbar.author>
-# <xbar.desc>Rotating JSON-backed CCF conference deadlines with AoE/IANA timezone support and full timelines.</xbar.desc>
+# <xbar.desc>SwiftBar/xbar conference deadlines with selectable conferences, time-zone conversion, and full timelines.</xbar.desc>
 # <xbar.dependencies>bash,jq</xbar.dependencies>
 
 # macOS ships Bash 3.2, so this script intentionally avoids associative arrays,
 # mapfile/readarray, GNU-only sed flags, and other newer Bash features.
 
 SCRIPT_DIR="$(CDPATH= cd "$(dirname "$0")" 2>/dev/null && pwd)"
+SCRIPT_PATH="${SWIFTBAR_PLUGIN_PATH:-$0}"
+case "$SCRIPT_PATH" in
+  /*) ;;
+  *) SCRIPT_PATH="$SCRIPT_DIR/$(basename "$SCRIPT_PATH")" ;;
+esac
 DEFAULT_CONFIG_FILE="$HOME/.config/xbar/ccf-ddl.json"
 CONFIG_FILE="${CCF_DDL_CONFIG:-$DEFAULT_CONFIG_FILE}"
 
@@ -33,15 +38,24 @@ DROPDOWN_FILE="${TMP_BASE}.dropdown"
 SORTED_FILE="${TMP_BASE}.sorted"
 RECORDS_FILE="${TMP_BASE}.records"
 TIMELINE_TMP="${TMP_BASE}.timeline"
+VISIBILITY_FILE="${TMP_BASE}.visibility"
 : > "$CAROUSEL_FILE"
 : > "$DROPDOWN_FILE"
 : > "$TIMELINE_TMP"
-trap 'rm -f "$CAROUSEL_FILE" "$DROPDOWN_FILE" "$SORTED_FILE" "$RECORDS_FILE" "$TIMELINE_TMP"' EXIT HUP INT TERM
+: > "$VISIBILITY_FILE"
+trap 'rm -f "$CAROUSEL_FILE" "$DROPDOWN_FILE" "$SORTED_FILE" "$RECORDS_FILE" "$TIMELINE_TMP" "$VISIBILITY_FILE"' EXIT HUP INT TERM
 
 sanitize_text() {
   # xbar uses | as the parameter delimiter.
   printf '%s' "$1" | tr '|' '/'
 }
+
+swiftbar_escape_attribute() {
+  # Attribute values are double-quoted in SwiftBar output.
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+SCRIPT_ACTION_PATH="$(swiftbar_escape_attribute "$SCRIPT_PATH")"
 
 trim_cr() {
   printf '%s' "$1" | tr -d '\r'
@@ -149,6 +163,56 @@ emit_error() {
   exit 0
 }
 
+set_conference_visibility() {
+  local conference_index="$1"
+  local new_visibility="$2"
+  local config_tmp original_mode
+
+  case "$conference_index" in
+    ''|*[!0-9]*)
+      printf '%s\n' "Invalid conference index: $conference_index" >&2
+      return 1
+      ;;
+  esac
+
+  case "$new_visibility" in
+    true|false) ;;
+    *)
+      printf '%s\n' "Invalid visibility value: $new_visibility" >&2
+      return 1
+      ;;
+  esac
+
+  config_tmp="$(mktemp "${CONFIG_FILE}.tmp.XXXXXX")" || {
+    printf '%s\n' "Unable to create a temporary configuration beside: $CONFIG_FILE" >&2
+    return 1
+  }
+
+  if ! jq --argjson conference_index "$conference_index" \
+          --argjson new_visibility "$new_visibility" '
+    if $conference_index >= 0 and $conference_index < (.conferences | length) then
+      .conferences[$conference_index].visible = $new_visibility
+    else
+      error("conference index out of range")
+    end
+  ' "$CONFIG_FILE" > "$config_tmp"; then
+    rm -f "$config_tmp"
+    printf '%s\n' "Unable to update conference visibility in: $CONFIG_FILE" >&2
+    return 1
+  fi
+
+  original_mode="$(stat -f '%Lp' "$CONFIG_FILE" 2>/dev/null || stat -c '%a' "$CONFIG_FILE" 2>/dev/null)"
+  if [ -n "$original_mode" ]; then
+    chmod "$original_mode" "$config_tmp" 2>/dev/null || true
+  fi
+
+  if ! mv "$config_tmp" "$CONFIG_FILE"; then
+    rm -f "$config_tmp"
+    printf '%s\n' "Unable to replace configuration: $CONFIG_FILE" >&2
+    return 1
+  fi
+}
+
 [ -f "$CONFIG_FILE" ] || emit_error "Configuration not found" "Expected: $CONFIG_FILE"
 command -v jq >/dev/null 2>&1 || emit_error "Missing dependency: jq" "Install it with: brew install jq"
 
@@ -187,6 +251,18 @@ validate_config() {
 
 validate_config || emit_error "Invalid JSON configuration" "Check schema version and required fields in: $CONFIG_FILE"
 
+case "${1:-}" in
+  --set-visible)
+    set_conference_visibility "${2:-}" "${3:-}" || exit 1
+    exit 0
+    ;;
+  '') ;;
+  *)
+    printf '%s\n' "Unknown action: $1" >&2
+    exit 2
+    ;;
+esac
+
 SETTINGS_LINE="$(jq -r '[
   .settings.warning_days,
   .settings.urgent_days,
@@ -204,7 +280,9 @@ EOF_SETTINGS
 # Convert the JSON hierarchy to a small record stream once. The remaining
 # state machine stays compatible with the Bash 3.2 bundled with macOS.
 jq -r '
-  .conferences[] as $conference |
+  .conferences | to_entries[] |
+  .key as $conference_index |
+  .value as $conference |
   ([
     "CONF",
     $conference.name,
@@ -213,7 +291,8 @@ jq -r '
     $conference.timezone,
     $conference.url,
     ($conference.order | tostring),
-    ($conference.visible | tostring)
+    ($conference.visible | tostring),
+    ($conference_index | tostring)
   ] | @tsv),
   ($conference.stages[] | [
     "STAGE",
@@ -234,6 +313,7 @@ CONF_TZ='AoE'
 CONF_URL=''
 CONF_ORDER='0'
 CONF_VISIBLE=true
+CONF_INDEX='0'
 NEXT_FOUND=false
 NEXT_STAGE=''
 NEXT_EVENT=''
@@ -248,6 +328,7 @@ reset_conf() {
   CONF_URL="$5"
   CONF_ORDER="$6"
   CONF_VISIBLE="$7"
+  CONF_INDEX="$8"
   NEXT_FOUND=false
   NEXT_STAGE=''
   NEXT_EVENT=''
@@ -258,16 +339,26 @@ reset_conf() {
 
 flush_conf() {
   [ "$CONF_ACTIVE" = true ] || return 0
-  if ! bool_true "$CONF_VISIBLE"; then
-    CONF_ACTIVE=false
-    return 0
-  fi
 
-  local full short ccf url
+  local full short ccf url next_visibility checked_parameter
   full="$(sanitize_text "$CONF_FULL")"
   short="$(sanitize_text "$CONF_SHORT")"
   ccf="$(sanitize_text "$CONF_CCF")"
   url="$CONF_URL"
+
+  if bool_true "$CONF_VISIBLE"; then
+    next_visibility=false
+    checked_parameter=' checked=true'
+  else
+    next_visibility=true
+    checked_parameter=''
+  fi
+  printf '%s\n' "--[CCF-${ccf}] ${full} | bash=\"${SCRIPT_ACTION_PATH}\" param1=--set-visible param2=${CONF_INDEX} param3=${next_visibility} terminal=false refresh=true${checked_parameter}" >> "$VISIBILITY_FILE"
+
+  if ! bool_true "$CONF_VISIBLE"; then
+    CONF_ACTIVE=false
+    return 0
+  fi
 
   if [ "$NEXT_FOUND" = true ]; then
     local delta remain color top_line epoch_key important_secs
@@ -333,7 +424,7 @@ EOF_FIELDS
   case "$kind" in
     CONF)
       flush_conf
-      reset_conf "$f1" "$f2" "$f3" "$f4" "$f5" "$f6" "$f7"
+      reset_conf "$f1" "$f2" "$f3" "$f4" "$f5" "$f6" "$f7" "$extra"
       ;;
 
     STAGE)
@@ -400,6 +491,14 @@ else
   echo "--Times: configured conference timezone"
 fi
 echo "--Refresh | refresh=true"
+echo "---"
+
+echo "Conference Visibility"
+if [ -s "$VISIBILITY_FILE" ]; then
+  cat "$VISIBILITY_FILE"
+else
+  echo "--No conferences configured"
+fi
 echo "---"
 
 # Remove the trailing conference separator for a cleaner menu.
