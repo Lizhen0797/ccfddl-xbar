@@ -340,10 +340,9 @@ reset_conf() {
 flush_conf() {
   [ "$CONF_ACTIVE" = true ] || return 0
 
-  local full short ccf url full_attribute next_visibility checked_parameter
+  local full short url full_attribute next_visibility checked_parameter
   full="$(sanitize_text "$CONF_FULL")"
   short="$(sanitize_text "$CONF_SHORT")"
-  ccf="$(sanitize_text "$CONF_CCF")"
   url="$CONF_URL"
   full_attribute="$(swiftbar_escape_attribute "$full")"
 
@@ -354,7 +353,7 @@ flush_conf() {
     next_visibility=true
     checked_parameter=''
   fi
-  printf '%s\n' "--[CCF-${ccf}] ${short} | tooltip=\"${full_attribute}\" bash=\"${SCRIPT_ACTION_PATH}\" param1=--set-visible param2=${CONF_INDEX} param3=${next_visibility} terminal=false refresh=true${checked_parameter}" >> "$VISIBILITY_FILE"
+  printf '%s\n' "--${short} | tooltip=\"${full_attribute}\" bash=\"${SCRIPT_ACTION_PATH}\" param1=--set-visible param2=${CONF_INDEX} param3=${next_visibility} terminal=false refresh=true${checked_parameter}" >> "$VISIBILITY_FILE"
 
   if ! bool_true "$CONF_VISIBLE"; then
     CONF_ACTIVE=false
@@ -381,9 +380,9 @@ flush_conf() {
     fi
 
     if [ -n "$url" ]; then
-      printf '%s | href=%s tooltip="%s"\n' "[CCF-${ccf}] ${short}" "$url" "$full_attribute" >> "$DROPDOWN_FILE"
+      printf '%s | href=%s tooltip="%s"\n' "$short" "$url" "$full_attribute" >> "$DROPDOWN_FILE"
     else
-      printf '%s | tooltip="%s"\n' "[CCF-${ccf}] ${short}" "$full_attribute" >> "$DROPDOWN_FILE"
+      printf '%s | tooltip="%s"\n' "$short" "$full_attribute" >> "$DROPDOWN_FILE"
     fi
     printf '%s\n' "--Current: ${NEXT_STAGE}" >> "$DROPDOWN_FILE"
     printf '%s\n' "--Next: ${NEXT_EVENT}" >> "$DROPDOWN_FILE"
@@ -396,9 +395,9 @@ flush_conf() {
   else
     if bool_true "$SHOW_FINISHED"; then
       if [ -n "$url" ]; then
-        printf '%s | href=%s tooltip="%s"\n' "[CCF-${ccf}] ${short}" "$url" "$full_attribute" >> "$DROPDOWN_FILE"
+        printf '%s | href=%s tooltip="%s"\n' "$short" "$url" "$full_attribute" >> "$DROPDOWN_FILE"
       else
-        printf '%s | tooltip="%s"\n' "[CCF-${ccf}] ${short}" "$full_attribute" >> "$DROPDOWN_FILE"
+        printf '%s | tooltip="%s"\n' "$short" "$full_attribute" >> "$DROPDOWN_FILE"
       fi
       printf '%s\n' '--Status: finished' >> "$DROPDOWN_FILE"
       printf '%s\n' '--Timeline' >> "$DROPDOWN_FILE"
