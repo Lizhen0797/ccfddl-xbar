@@ -1,6 +1,13 @@
 {
   "schema_version": 1,
-  "verified_at": "2026-09-21",
+  "verified_at": "2026-09-22",
+  "time_convention": {
+    "date_range_start": "00:00",
+    "date_range_end": "23:59",
+    "date_only_deadline": "23:59",
+    "conference_first_day": "00:00",
+    "note": "Event-specific times published by an official source override these date-only defaults."
+  },
   "settings": {
     "warning_days": 7,
     "urgent_days": 3,
@@ -43,7 +50,7 @@
         {
           "phase": "Rebuttal",
           "event": "Rebuttal Starts",
-          "datetime": "2026-11-05 23:59"
+          "datetime": "2026-11-05 00:00"
         },
         {
           "phase": "Rebuttal",
@@ -99,7 +106,7 @@
         {
           "phase": "Rebuttal",
           "event": "Rebuttal Starts",
-          "datetime": "2027-04-08 23:59"
+          "datetime": "2027-04-08 00:00"
         },
         {
           "phase": "Rebuttal",
@@ -124,7 +131,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2027-08-11 23:59"
+          "datetime": "2027-08-11 00:00",
+          "timezone": "America/Denver"
         }
       ]
     },
@@ -155,7 +163,7 @@
         {
           "phase": "Rebuttal",
           "event": "Rebuttal Starts",
-          "datetime": "2026-03-17 23:59"
+          "datetime": "2026-03-17 00:00"
         },
         {
           "phase": "Rebuttal",
@@ -211,7 +219,7 @@
         {
           "phase": "Rebuttal",
           "event": "Rebuttal Starts",
-          "datetime": "2026-06-29 23:59"
+          "datetime": "2026-06-29 00:00"
         },
         {
           "phase": "Rebuttal",
@@ -236,7 +244,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2026-11-15 23:59"
+          "datetime": "2026-11-15 00:00",
+          "timezone": "Europe/Amsterdam"
         }
       ]
     },
@@ -262,7 +271,7 @@
         {
           "phase": "Rebuttal",
           "event": "Rebuttal Starts",
-          "datetime": "2026-07-15 23:59"
+          "datetime": "2026-07-15 00:00"
         },
         {
           "phase": "Rebuttal",
@@ -323,7 +332,7 @@
         {
           "phase": "Rebuttal",
           "event": "Rebuttal Starts",
-          "datetime": "2026-11-11 23:59"
+          "datetime": "2026-11-11 00:00"
         },
         {
           "phase": "Rebuttal",
@@ -358,7 +367,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2027-03-22 23:59"
+          "datetime": "2027-03-22 00:00",
+          "timezone": "Asia/Seoul"
         }
       ]
     },
@@ -390,6 +400,11 @@
           "phase": "Review",
           "event": "Reviews",
           "datetime": "2026-08-20 23:59"
+        },
+        {
+          "phase": "Rebuttal",
+          "event": "Interactive Starts",
+          "datetime": "2026-08-26 23:59"
         },
         {
           "phase": "Rebuttal",
@@ -480,7 +495,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2027-05-17 23:59"
+          "datetime": "2027-05-17 00:00",
+          "timezone": "America/Toronto"
         }
       ]
     },
@@ -526,7 +542,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2026-12-06 23:59"
+          "datetime": "2026-12-06 00:00",
+          "timezone": "Australia/Sydney"
         }
       ]
     },
@@ -551,8 +568,8 @@
         },
         {
           "phase": "Review",
-          "event": "Reviews",
-          "datetime": "2026-11-05 23:59"
+          "event": "Reviews / Discussion Starts",
+          "datetime": "2026-11-05 00:00"
         },
         {
           "phase": "Discussion",
@@ -567,7 +584,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2027-04-26 23:59"
+          "datetime": "2027-04-26 00:00",
+          "note": "Venue timezone not announced as of 2026-09-22; inherits the conference AoE fallback."
         }
       ]
     },
@@ -603,7 +621,7 @@
         {
           "phase": "Feedback",
           "event": "Feedback Starts",
-          "datetime": "2026-10-19 23:59"
+          "datetime": "2026-10-19 00:00"
         },
         {
           "phase": "Feedback",
@@ -623,7 +641,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2027-02-16 23:59"
+          "datetime": "2027-02-16 00:00",
+          "timezone": "America/Toronto"
         }
       ]
     },
@@ -648,8 +667,8 @@
         },
         {
           "phase": "Review",
-          "event": "Results",
-          "datetime": "2026-12-21 23:59"
+          "event": "Results / Rebuttal Starts",
+          "datetime": "2026-12-21 00:00"
         },
         {
           "phase": "Rebuttal",
@@ -669,7 +688,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2027-05-10 23:59"
+          "datetime": "2027-05-10 00:00",
+          "timezone": "Europe/Dublin"
         }
       ]
     },
@@ -715,7 +735,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2026-07-06 23:59"
+          "datetime": "2026-07-06 00:00",
+          "timezone": "Asia/Seoul"
         }
       ]
     },
@@ -741,7 +762,7 @@
         {
           "phase": "Response",
           "event": "Response Starts",
-          "datetime": "2026-09-23 23:59"
+          "datetime": "2026-09-23 00:00"
         },
         {
           "phase": "Response",
@@ -776,7 +797,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2027-04-25 23:59"
+          "datetime": "2027-04-25 00:00",
+          "timezone": "Europe/Dublin"
         }
       ]
     },
@@ -796,8 +818,8 @@
         },
         {
           "phase": "Review",
-          "event": "Early Reject",
-          "datetime": "2026-05-25 23:59"
+          "event": "Early Reject / Response Starts",
+          "datetime": "2026-05-25 00:00"
         },
         {
           "phase": "Response",
@@ -827,7 +849,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2026-10-12 23:59"
+          "datetime": "2026-10-12 00:00",
+          "timezone": "Europe/Berlin"
         }
       ]
     },
@@ -853,7 +876,7 @@
         {
           "phase": "Response",
           "event": "Response Starts",
-          "datetime": "2027-03-22 23:59"
+          "datetime": "2027-03-22 00:00"
         },
         {
           "phase": "Response",
@@ -883,7 +906,8 @@
         {
           "phase": "Waiting",
           "event": "Conf",
-          "datetime": "2027-09-07 23:59"
+          "datetime": "2027-09-07 00:00",
+          "timezone": "Asia/Singapore"
         }
       ]
     },

@@ -175,7 +175,8 @@ validate_config() {
       all(.stages[];
         (.phase | nonempty_string) and
         (.event | nonempty_string) and
-        (.datetime | nonempty_string)
+        (.datetime | nonempty_string) and
+        (((. | has("timezone")) == false) or (.timezone | nonempty_string))
       )
     )
   ' "$CONFIG_FILE" >/dev/null 2>&1
@@ -211,7 +212,13 @@ jq -r '
     ($conference.order | tostring),
     ($conference.visible | tostring)
   ] | @tsv),
-  ($conference.stages[] | ["STAGE", .phase, .event, .datetime] | @tsv),
+  ($conference.stages[] | [
+    "STAGE",
+    .phase,
+    .event,
+    .datetime,
+    (.timezone // $conference.timezone)
+  ] | @tsv),
   (["END"] | @tsv)
 ' "$CONFIG_FILE" > "$RECORDS_FILE" || emit_error "Unable to read JSON configuration" "$CONFIG_FILE"
 
@@ -332,12 +339,13 @@ EOF_FIELDS
       stage="$f1"
       event="$f2"
       dt="$f3"
-      event_epoch="$(parse_epoch "$dt" "$CONF_TZ")"
+      stage_tz="$f4"
+      event_epoch="$(parse_epoch "$dt" "$stage_tz")"
       if [ -z "$event_epoch" ]; then
-        printf '%s\n' "⚠ Invalid date: $(sanitize_text "$event") · $(sanitize_text "$dt") $(display_tz "$CONF_TZ")" >> "$TIMELINE_TMP"
+        printf '%s\n' "⚠ Invalid date: $(sanitize_text "$event") · $(sanitize_text "$dt") $(display_tz "$stage_tz")" >> "$TIMELINE_TMP"
         continue
       fi
-      event_display="$(format_datetime "$event_epoch" "$dt" "$CONF_TZ")"
+      event_display="$(format_datetime "$event_epoch" "$dt" "$stage_tz")"
 
       if [ "$event_epoch" -le "$NOW_EPOCH" ]; then
         printf '%s\n' "✓ $(sanitize_text "$event") · $(sanitize_text "$event_display")" >> "$TIMELINE_TMP"

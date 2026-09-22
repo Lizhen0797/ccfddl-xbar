@@ -9,7 +9,7 @@ A macOS [xbar](https://xbarapp.com/) plugin for tracking academic conference tim
 - Stores global settings, conferences, and timeline events in JSON.
 - Rotates only dates within a configurable importance window, which defaults to 14 days.
 - Lets each conference be shown or hidden independently with `visible`.
-- Supports AoE, UTC, and other IANA time zones.
+- Supports AoE, UTC, and other IANA time zones, including per-event overrides.
 - Can automatically convert every conference event to the computer's local time zone.
 - Marks completed, current, and future timeline events automatically.
 - Uses red and orange colors for urgent and approaching dates.
@@ -77,7 +77,8 @@ The configuration has the following top-level structure:
 ```json
 {
   "schema_version": 1,
-  "verified_at": "2026-09-21",
+  "verified_at": "2026-09-22",
+  "time_convention": {},
   "settings": {},
   "conferences": []
 }
@@ -149,6 +150,20 @@ When `visible` is `false`, the conference is removed from both the menu-bar caro
 "visible": false
 ```
 
+### Date-Only Time Convention
+
+Conference pages often publish only a calendar date, even for a multi-day response, rebuttal, or conference period. The configuration uses these defaults when the official source does not publish a more precise time:
+
+- the first day of a date range uses `00:00`;
+- the last day of a date range uses `23:59`;
+- a date-only deadline uses `23:59`;
+- the first day of a conference uses `00:00` in the venue's local time zone, when that time zone is known;
+- an event-specific time from the official source always overrides these defaults.
+
+The top-level `time_convention` object records this policy in the JSON file. A same-day release or notification that opens a published response window is treated as the window start.
+
+ICSE 2027 is a notable ambiguous case: its page calls September 23–25 a three-day author-response period, but also says that all dates are at `23:59:59 AoE`. This configuration treats the inclusive period as September 23 `00:00` through September 25 `23:59` AoE. That is a tracker normalization, not a guarantee that HotCRP will open at midnight; the submission system and organizer announcements remain authoritative.
+
 ### Timeline Events
 
 Each timeline event contains:
@@ -156,6 +171,18 @@ Each timeline event contains:
 - `phase`: the current workflow phase, such as `Submit`, `Review`, `Rebuttal`, or `Decision`;
 - `event`: the specific event, such as `Paper`, `Notify`, or `Camera Ready`;
 - `datetime`: the local wall-clock time in the conference's configured time zone, formatted as `YYYY-MM-DD HH:MM`.
+- `timezone` (optional): an AoE, UTC, or IANA time-zone override for this event. When omitted, the event inherits the conference's `timezone`.
+
+Per-event time zones are useful when submission deadlines are AoE but the conference itself starts in the venue's local time zone:
+
+```json
+{
+  "phase": "Waiting",
+  "event": "Conf",
+  "datetime": "2027-08-11 00:00",
+  "timezone": "America/Denver"
+}
+```
 
 The script treats the first future event of each conference as its next event. Timeline symbols mean:
 
@@ -165,7 +192,7 @@ The script treats the first future event of each conference as its next event. T
 
 ### Local Time-Zone Conversion
 
-Conference dates remain stored in the time zone declared by each conference. With the default setting below, the plugin first interprets the configured wall-clock time in that source time zone and then displays the equivalent time in the computer's local time zone:
+Conference dates remain stored in the time zone declared by each conference or by an individual event override. With the default setting below, the plugin first interprets the configured wall-clock time in that source time zone and then displays the equivalent time in the computer's local time zone:
 
 ```json
 "display_local_time": true
@@ -209,7 +236,9 @@ When adding or updating a conference:
 2. Use an integer for `order`; unique values are recommended.
 3. Keep `stages` in chronological order.
 4. Use the time zone specified by the official conference website.
-5. Update the top-level `verified_at` value after verifying the data.
+5. Add a stage-level `timezone` when an event uses a different time zone, such as a venue-local conference start following AoE submission deadlines.
+6. Apply the top-level date-only time convention unless the official source gives an explicit time.
+7. Update the top-level `verified_at` value after verifying the data.
 
 Conference organizers may revise dates at any time. `verified_at` records the last manual verification of the configuration; it does not mean that the program continuously validates the data.
 
