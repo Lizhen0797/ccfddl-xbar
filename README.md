@@ -203,7 +203,7 @@ The script treats the first future event of each conference as its next event. T
 - `▶`: the current next event;
 - `○`: a later event.
 
-Remaining time is shown to hour precision: `2d9h` means two days and nine hours, `9h` means less than one day remains, and durations below one hour are shown in minutes.
+The menu-bar carousel shows only the conference abbreviation, the next event, and the remaining time, for example `NeurIPS'26 · Notification · 2d9h`. The broader workflow phase remains available as `Current` in the dropdown details. Remaining time is shown to hour precision: `2d9h` means two days and nine hours, `9h` means less than one day remains, and durations below one hour are shown in minutes.
 
 ### Local Time-Zone Conversion
 

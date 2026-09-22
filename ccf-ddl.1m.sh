@@ -365,7 +365,7 @@ flush_conf() {
     delta=$((NEXT_EPOCH - NOW_EPOCH))
     remain="$(remaining_text "$delta")"
     color="$(status_color "$delta")"
-    top_line="${short} · ${NEXT_STAGE}→${NEXT_EVENT} · ${remain}"
+    top_line="${short} · ${NEXT_EVENT} · ${remain}"
     epoch_key="$NEXT_EPOCH"
     important_secs=$((IMPORTANT_DAYS * 86400))
 
