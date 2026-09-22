@@ -156,11 +156,13 @@ Conference pages often publish only a calendar date, even for a multi-day respon
 
 - the first day of a date range uses `00:00`;
 - the last day of a date range uses `23:59`;
-- a date-only deadline uses `23:59`;
+- notifications and releases, including early-reject notifications and review releases, use `00:00`;
+- response, rebuttal, feedback, discussion, and other window starts use `00:00`;
+- submission deadlines and window ends or due dates use `23:59`;
 - the first day of a conference uses `00:00` in the venue's local time zone, when that time zone is known;
-- an event-specific time from the official source always overrides these defaults.
+- an event-specific time from the official source can replace these date-only defaults.
 
-The top-level `time_convention` object records this policy in the JSON file. A same-day release or notification that opens a published response window is treated as the window start.
+The top-level `time_convention` object records this policy in the JSON file. Event names distinguish starts and announcements from deadlines: for example, `Rebuttal Starts` is at `00:00`, while `Rebuttal Ends` or `Rebuttal Due` is at `23:59`.
 
 ICSE 2027 is a notable ambiguous case: its page calls September 23–25 a three-day author-response period, but also says that all dates are at `23:59:59 AoE`. This configuration treats the inclusive period as September 23 `00:00` through September 25 `23:59` AoE. That is a tracker normalization, not a guarantee that HotCRP will open at midnight; the submission system and organizer announcements remain authoritative.
 
@@ -169,7 +171,7 @@ ICSE 2027 is a notable ambiguous case: its page calls September 23–25 a three-
 Each timeline event contains:
 
 - `phase`: the current workflow phase, such as `Submit`, `Review`, `Rebuttal`, or `Decision`;
-- `event`: the specific event, such as `Paper`, `Notify`, or `Camera Ready`;
+- `event`: the specific event, such as `Paper`, `Notification`, or `Camera Ready`;
 - `datetime`: the local wall-clock time in the conference's configured time zone, formatted as `YYYY-MM-DD HH:MM`.
 - `timezone` (optional): an AoE, UTC, or IANA time-zone override for this event. When omitted, the event inherits the conference's `timezone`.
 
