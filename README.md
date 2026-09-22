@@ -159,7 +159,7 @@ Open the plugin menu and expand **Conference Visibility**. It always contains ev
 - click a checked conference to hide it;
 - click an unchecked conference to show it again.
 
-Each click atomically updates that conference's `visible` value in the active JSON configuration and asks SwiftBar to refresh the plugin. The selector itself remains available even when every conference is hidden.
+The visibility checklist and conference headings use `short_name`, such as `NeurIPS'26` or `ICSE'27`, to keep the menu compact. Hover over an item to see its full conference name. Each click atomically updates that conference's `visible` value in the active JSON configuration and asks SwiftBar to refresh the plugin. The selector itself remains available even when every conference is hidden.
 
 ### Date-Only Time Convention
 
