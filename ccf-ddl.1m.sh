@@ -83,12 +83,15 @@ parse_epoch() {
 
 remaining_text() {
   local delta="$1"
+  local days hours
   if [ "$delta" -le 0 ]; then
     printf '%s' 'now'
-  elif [ "$delta" -ge 172800 ]; then
-    printf '%sd' "$(( (delta + 86399) / 86400 ))"
+  elif [ "$delta" -ge 86400 ]; then
+    days=$((delta / 86400))
+    hours=$(( (delta % 86400) / 3600 ))
+    printf '%sd%sh' "$days" "$hours"
   elif [ "$delta" -ge 3600 ]; then
-    printf '%sh' "$(( (delta + 3599) / 3600 ))"
+    printf '%sh' "$((delta / 3600))"
   else
     printf '%sm' "$(( (delta + 59) / 60 ))"
   fi

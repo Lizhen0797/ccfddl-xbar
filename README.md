@@ -190,6 +190,8 @@ The script treats the first future event of each conference as its next event. T
 - `▶`: the current next event;
 - `○`: a later event.
 
+Remaining time is shown to hour precision: `2d9h` means two days and nine hours, `9h` means less than one day remains, and durations below one hour are shown in minutes.
+
 ### Local Time-Zone Conversion
 
 Conference dates remain stored in the time zone declared by each conference or by an individual event override. With the default setting below, the plugin first interprets the configured wall-clock time in that source time zone and then displays the equivalent time in the computer's local time zone:
