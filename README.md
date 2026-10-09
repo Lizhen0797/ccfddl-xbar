@@ -13,6 +13,10 @@ A macOS [SwiftBar](https://github.com/swiftbar/SwiftBar) and [xbar](https://xbar
 - Supports AoE, UTC, and other IANA time zones, including per-event overrides.
 - Can automatically convert every conference event to the computer's local time zone.
 - Marks completed, current, and future timeline events automatically.
+- Separates the current workflow stage from the nearest upcoming event.
+- Rejects invalid calendar dates, unknown time zones, and nonexistent daylight-saving wall-clock times instead of silently normalizing them.
+- Caches validated timestamps, sorted events, and local display text between refreshes; countdowns and workflow state still update every minute.
+- Lets the timeline width, label width, font, colors, markers, and axis symbols be configured in JSON.
 - Shows a combined, color-coded timeline of selected conferences' events in the next calendar month.
 - Uses red and orange colors for urgent and approaching dates.
 - Supports deadline-based or configured ordering and an optional carousel limit.
@@ -27,7 +31,8 @@ This project does not fetch conference information from the internet or update d
 .
 ├── ccf-ddl.1m.sh   # SwiftBar/xbar plugin, executed once per minute
 ├── ccf-ddl.json    # Settings, conferences, and timeline events
-└── README.md
+├── README.md
+└── tests/         # Timeline, date-validation, and workflow regression tests
 ```
 
 ## Requirements
@@ -98,7 +103,9 @@ The configuration has the following top-level structure:
   "show_ccf_level": false,
   "show_finished": false,
   "carousel_limit": 0,
-  "sort_by_deadline": true
+  "sort_by_deadline": true,
+  "cache_dates": true,
+  "timeline": {}
 }
 ```
 
@@ -108,13 +115,63 @@ The configuration has the following top-level structure:
 | `urgent_days` | Non-negative integer | Show an urgent date in red when its remaining time is within this threshold. |
 | `important_days` | Non-negative integer | Include a conference in the menu-bar carousel only when its next event is within this many days. |
 | `display_local_time` | Boolean | Convert configured conference times to the computer's local time zone when `true`. |
-| `show_phase_in_carousel` | Boolean | Prefix the next event with its broader workflow phase in the menu-bar carousel when `true`. |
+| `show_phase_in_carousel` | Boolean | Prefix the next event with the actual current workflow stage in the menu-bar carousel when `true`. |
 | `show_ccf_level` | Boolean | Prefix conference abbreviations with their CCF level throughout the menu when `true`. |
 | `show_finished` | Boolean | Keep conferences whose entire timeline has finished in the dropdown menu. |
 | `carousel_limit` | Non-negative integer | Maximum number of rotating entries; `0` means no additional limit. |
 | `sort_by_deadline` | Boolean | Use the next deadline when `true`; use each conference's `order` value when `false`. |
+| `cache_dates` | Boolean | Cache date parsing and timezone conversions when `true` (the default if omitted). |
+| `timeline` | Object | Optional timeline appearance overrides; omitted fields keep their defaults. |
 
 The `important_days` boundary is inclusive. For example, when it is `14`, a next event no more than 14×24 hours away can enter the carousel. This setting affects only the menu-bar carousel; all visible, active conferences remain available in the dropdown menu.
+
+### Timeline Appearance
+
+The repository JSON contains the full default theme in `settings.timeline`.
+Existing installed configurations need no changes: the plugin deep-merges a
+partial theme with its defaults. For example, the following overrides only
+the maximum axis width, font size, Submit color, and submission markers:
+
+```json
+"timeline": {
+  "max_width": 200,
+  "font_size": 12,
+  "colors": {
+    "Submit": "#124D61,#9ADDEC"
+  },
+  "markers": {
+    "Abstract": "○",
+    "Full": "●"
+  }
+}
+```
+
+| Property | Default | Meaning / accepted values |
+| --- | --- | --- |
+| `min_width` | `49` | Minimum axis width in character cells, from 16 to 500. |
+| `max_width` | `160` | Maximum axis width in character cells, from 16 to 500 and at least `min_width`. |
+| `label_width` | `15` | Conference-label column width, from 8 to 64; longer names are truncated. |
+| `font` | `"Menlo"` | Font family; use a monospaced font to preserve alignment. Names with spaces, such as `"SF Mono"`, are supported. |
+| `font_size` | `11` | Font size, an integer from 6 to 48. |
+| `colors` | Default light/dark palette | Map from phase/style names to `#RRGGBB` or `#light,#dark`. |
+| `markers` | Default phase markers | Map from milestone names to one ASCII, box-drawing, or supported geometric-symbol character. |
+| `symbols.line` | `"─"` | Track/axis line character. |
+| `symbols.tick` | `"┬"` | Axis tick character. |
+| `symbols.overlap` | `"+"` | Marker used when multiple milestones share a track position. |
+
+Color keys are `Submit`, `Review`, `Rebuttal`, `Notification`, `Revision`,
+`Camera Ready`, `Conference`, `Axis`, and `Default`. The `Submit` color applies
+to both the entire Submit track and its Abstract/Full/Deadline legend items.
+Marker keys are `Abstract`, `Full`, `Deadline`, `Review`, `Rebuttal`,
+`Notification`, `Revision`, `Camera Ready`, `Conference`, and `Default`.
+Custom phase keys can be added to either map; unknown phases use `Default`.
+Colors and symbols are applied consistently to tracks and the legend.
+
+The default palette retains the tested light/dark contrast. Supported geometric
+markers include `○●△▲▽▼◇◆□■◊◦◎◉◌`. Symbol overrides
+must be single-cell characters; whitespace, emoji, backslashes, and `|` are rejected to
+avoid breaking alignment or SwiftBar's parameter syntax. Width limits affect
+the chart layout, not its calendar-month window or the actual event times.
 
 ### Conference Configuration
 
@@ -148,7 +205,7 @@ Each conference has the following structure:
 | `timezone` | String | `AoE`, `UTC`, or an IANA time-zone name. |
 | `url` | String | Conference page opened from the dropdown menu. |
 | `order` | Integer | Display order when deadline sorting is disabled. |
-| `stages` | Array | Conference events in chronological order. |
+| `stages` | Array | Conference events; the plugin sorts them by their actual instants after applying time zones. |
 
 When `visible` is `false`, the conference is removed from both the menu-bar carousel and the dropdown details, while its data remains in the configuration:
 
@@ -170,7 +227,7 @@ The visibility checklist and conference headings use `short_name`, such as `Neur
 
 Expand **Timeline Overview** for a horizontal, CCF Cycle-inspired timeline. All conferences checked in **Conference Visibility** share one date axis. A marker's horizontal position is proportional to its actual time between the current moment and the same local clock time one calendar month later. Past dates are not plotted, and selected conferences with no milestone in this window are omitted from the chart (they remain selected in **Conference Visibility**). If a conference has milestones in different display phases, it gets adjacent tracks on the same axis.
 
-The chart uses a display-only mapping; the original JSON phases and event names are unchanged. All submission milestones for a conference share one `Submit` track, while the marker and legend distinguish their event types:
+The chart and workflow engine share a phase mapping; the original JSON phases and event names are unchanged. All submission milestones for a conference share one `Submit` track, while the marker and legend distinguish their event types:
 
 | Configured phase or event | Track label | Marker / legend |
 | --- | --- | --- |
@@ -208,10 +265,12 @@ ICSE 2027 is a notable ambiguous case: its page calls September 23–25 a three-
 
 Each timeline event contains:
 
-- `phase`: the current workflow phase, such as `Submit`, `Review`, `Rebuttal`, or `Decision`;
+- `phase`: the event's workflow group, such as `Submit`, `Review`, `Rebuttal`, or `Decision`; this is not automatically the current stage;
 - `event`: the specific event, such as `Paper`, `Notification`, or `Camera Ready`;
 - `datetime`: the local wall-clock time in the conference's configured time zone, formatted as `YYYY-MM-DD HH:MM`.
 - `timezone` (optional): an AoE, UTC, or IANA time-zone override for this event. When omitted, the event inherits the conference's `timezone`.
+- `kind` (optional): `start`, `end`, `deadline`, `notification`, or `milestone`. This makes the event's role explicit instead of inferring it from its English name.
+- `phase_after` (optional): the workflow stage to use after this event occurs. Use this override for a transition that cannot be inferred from ordinary milestones.
 
 Per-event time zones are useful when submission deadlines are AoE but the conference itself starts in the venue's local time zone:
 
@@ -224,13 +283,46 @@ Per-event time zones are useful when submission deadlines are AoE but the confer
 }
 ```
 
-The script treats the first future event of each conference as its next event. Timeline symbols mean:
+Dates must exactly match `YYYY-MM-DD HH:MM` and exist in the specified time zone. For example, `2027-02-30`, `2027-02-29`, `24:00`, an unknown IANA zone, or a time skipped by a daylight-saving transition is rejected. Event seconds are explicitly zero. The plugin never silently moves such a date into another day. If a visible conference contains an invalid date or time zone, its details show a diagnostic and its countdown and overview markers are withheld until the data is fixed; other conferences continue to work.
+
+The script sorts events by their parsed timestamps, including per-event time zones, and selects the earliest event strictly after the current instant as `Next event`. Equal timestamps keep their original JSON order. Timeline symbols mean:
 
 - `✓`: completed;
-- `▶`: the current next event;
+- `▶`: the nearest upcoming event, not a statement that its stage has already started;
 - `○`: a later event.
 
-With `show_phase_in_carousel` set to `false`, the menu-bar carousel shows only the conference abbreviation, next event, and remaining time, for example `NeurIPS'26 · Notification · 2d9h`. Set it to `true` to show `NeurIPS'26 · Decision→Notification · 2d9h` instead. The broader workflow phase always remains available as `Current` in the dropdown details. Remaining time is shown to hour precision: `2d9h` means two days and nine hours, `9h` means less than one day remains, and durations below one hour are shown in minutes.
+With `show_phase_in_carousel` set to `false`, the menu-bar carousel shows only the conference abbreviation, next event, and remaining time, for example `NeurIPS'26 · Notification · 2d9h`. Set it to `true` to show `NeurIPS'26 · Review→Notification · 2d9h` instead. The prefix is the current stage, not the future event's configured phase. Dropdown details show separate `Current`, `Next event`, and `When` lines. Remaining time is shown to hour precision: `2d9h` means two days and nine hours, `9h` means less than one day remains, and durations below one hour are shown in minutes.
+
+### Current Stage vs. Next Event
+
+`Current` is inferred from milestones that have already occurred, rather than copied from the next event. Response, Discussion, Feedback, Interactive, and Rebuttal windows are normalized to `Rebuttal`. Notifications are instantaneous checkpoints; they do not become a persistent `Notification` stage.
+
+| Position in the configured timeline | Current | Example next event |
+| --- | --- | --- |
+| Submission deadlines remain | Submit | Paper |
+| Last submission deadline passed; rebuttal has not started | Review | Response Starts |
+| Rebuttal start reached; its end is still ahead | Rebuttal | Response Ends |
+| Rebuttal ended; decision is still ahead | Review | Notification |
+| Notification reached; revision deadline follows | Revision | Revision Due |
+| Notification reached; camera-ready deadline follows | Camera Ready | Camera Ready |
+| Final preparation completed; conference start is ahead | Waiting | Conf |
+| No future milestones remain | Finished | none |
+
+Stage transitions apply at the exact event timestamp: a start is active at that instant, while an end or deadline is already completed. An early/round notification or review release followed by further review/rebuttal activity keeps the current stage at `Review`. Consecutive response/discussion end milestones can represent one continuous normalized Rebuttal window; a later explicit start instead represents a separate window, with Review in between.
+
+These are workflow inferences from the configured data, not knowledge of an organizer's submission system. Missing opening dates cannot be recovered from a deadline alone. Add explicit start events to describe exact windows, and use `kind` for non-English/custom event names. `phase_after` takes precedence over inferred transitions, for example:
+
+```json
+{
+  "phase": "Response",
+  "event": "Author response opens",
+  "datetime": "2027-03-22 00:00",
+  "kind": "start",
+  "phase_after": "Rebuttal"
+}
+```
+
+Existing configurations need no new fields. Without `kind`, names such as `Starts`, `Ends`, and `Due` plus the shared phase mapping determine the event role. Without `phase_after`, the normal workflow transitions apply. `Finished` means that the configured timeline has no future milestone; it does not infer an unrecorded conference end date.
 
 ### Local Time-Zone Conversion
 
@@ -270,13 +362,47 @@ The script checks configuration locations in this order:
 2. `~/.config/xbar/ccf-ddl.json`;
 3. `ccf-ddl.json` in the script's directory.
 
+## Parsed Date Cache
+
+Date caching is enabled by default, including for legacy configurations without
+`cache_dates`. The cache stores validated timestamps, deterministic event order,
+source/local display timestamps, local calendar dates, and validation errors.
+It does not store the current stage, next event, countdown, or one-month window;
+those are recalculated on every refresh, even on a cache hit.
+
+The plugin rebuilds the cache when the configuration content, plugin code, local
+timezone, or relevant installed timezone-file contents change. Configuration
+checks use content checksums rather than modification times, so same-size edits
+with unchanged timestamps are detected. A single configuration snapshot is used
+per refresh. Cache files are published atomically with private permissions;
+damaged or truncated files are rebuilt. If the cache directory is unavailable
+or read-only, the plugin runs normally without persistent caching.
+
+By default, caches live outside the repository and installed configuration:
+
+- macOS: `~/Library/Caches/ccf-ddl`;
+- other systems: `~/.cache/ccf-ddl`;
+- if `XDG_CACHE_HOME` is set: `$XDG_CACHE_HOME/ccf-ddl` instead.
+
+Set `CCF_DDL_CACHE_DIR` to override that location. To disable caching, use
+`"cache_dates": false` in `settings`. For diagnostics, `CCF_DDL_CACHE_DEBUG=1`
+prints `hit`, `rebuilt`, `disabled`, or `unavailable` to stderr without changing
+the SwiftBar menu output:
+
+```bash
+CCF_DDL_CACHE_DEBUG=1 CCF_DDL_CONFIG="./ccf-ddl.json" ./ccf-ddl.1m.sh
+```
+
+Only parsed data is cached; cached content is never sourced or evaluated as
+shell code. Caching does not fetch new conference dates or modify preferences.
+
 ## Maintaining Conference Data
 
 When adding or updating a conference:
 
 1. Set `visible` to either `true` or `false`.
 2. Use an integer for `order`; unique values are recommended.
-3. Keep `stages` in chronological order.
+3. Prefer chronological order for readability; the plugin sorts by actual event timestamps automatically.
 4. Use the time zone specified by the official conference website.
 5. Add a stage-level `timezone` when an event uses a different time zone, such as a venue-local conference start following AoE submission deadlines.
 6. Apply the top-level date-only time convention unless the official source gives an explicit time.
@@ -309,6 +435,28 @@ tracks are hidden:
 bash tests/test_timeline_overview.sh
 ```
 
+Run the date and workflow tests. They cover invalid dates, leap-year rules,
+unknown time zones, a daylight-saving gap, explicit zero seconds, unsorted
+mixed-zone events, current/next separation, exact start/end boundaries, and
+optional event-role and transition overrides:
+
+```bash
+bash tests/test_dates_and_phases.sh
+```
+
+Run the cache/theme regression tests. They compare cold/warm output and native
+date-call counts, advance the clock on a cache hit, change the local timezone,
+test concurrent refreshes and same-size edits with preserved modification times, recover corrupted and
+truncated caches, retain invalid-date diagnostics, and exercise theme overrides,
+legacy defaults, and unavailable/disabled caching:
+
+```bash
+bash tests/test_cache_and_theme.sh
+```
+
+Tests use isolated temporary cache directories and do not write to the installed
+configuration or normal cache location.
+
 Inspect the generated xbar output:
 
 ```bash
@@ -338,6 +486,13 @@ jq empty ccf-ddl.json
 ```
 
 If the syntax is valid, check the types of all required fields. The script validates global settings, `visible`, conference metadata, and timeline event fields.
+
+### `Unavailable (invalid timeline)`
+
+Expand the conference's Timeline to find the invalid event. Correct its date/time
+or time-zone name in the active JSON file and refresh SwiftBar. Real calendar
+dates are required, including February's leap-year rules; use `00:00` on the
+following day instead of `24:00`. The plugin does not auto-correct invalid data.
 
 ### No conference is rotating in the menu bar
 
