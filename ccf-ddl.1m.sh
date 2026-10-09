@@ -1,6 +1,6 @@
 #!/bin/bash
 # <xbar.title>CCF Conference Deadlines</xbar.title>
-# <xbar.version>3.7</xbar.version>
+# <xbar.version>3.9</xbar.version>
 # <xbar.author>OpenAI</xbar.author>
 # <xbar.desc>SwiftBar/xbar conference deadlines with selectable conferences, time-zone conversion, and full timelines.</xbar.desc>
 # <xbar.dependencies>bash,jq</xbar.dependencies>
@@ -37,8 +37,29 @@ SHOW_CCF_LEVEL=false
 SHOW_FINISHED=false
 CAROUSEL_LIMIT=0   # 0 = rotate all active conferences
 SORT_BY_DEADLINE=true
+CACHE_DATES=true
 
-TMP_BASE="${TMPDIR:-/tmp}/ccf-ddl.$$"
+# One fallback theme for older configs; individual entries can be overridden.
+TIMELINE_DEFAULTS='{
+  "min_width": 49, "max_width": 160, "label_width": 15,
+  "font": "Menlo", "font_size": 11,
+  "colors": {
+    "Submit": "#124D61,#9ADDEC", "Review": "#394966,#CDD7EF",
+    "Rebuttal": "#6F4500,#FFD789", "Notification": "#10583F,#96E6BB",
+    "Revision": "#5B357D,#DCBDF4", "Camera Ready": "#3E5360,#C9DBE5",
+    "Conference": "#1B4A8D,#AECFFF", "Axis": "#45515D,#E0E5EB",
+    "Default": "#45515D,#E0E5EB"
+  },
+  "markers": {
+    "Abstract": "○", "Full": "●", "Deadline": "△", "Review": "●",
+    "Rebuttal": "◇", "Notification": "◆", "Revision": "□",
+    "Camera Ready": "●", "Conference": "●", "Default": "●"
+  },
+  "symbols": {"line": "─", "tick": "┬", "overlap": "+"}
+}'
+
+RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ccf-ddl.XXXXXX")" || exit 1
+TMP_BASE="${RUN_DIR}/run"
 CAROUSEL_FILE="${TMP_BASE}.carousel"
 DROPDOWN_FILE="${TMP_BASE}.dropdown"
 SORTED_FILE="${TMP_BASE}.sorted"
@@ -46,28 +67,38 @@ RECORDS_FILE="${TMP_BASE}.records"
 TIMELINE_TMP="${TMP_BASE}.timeline"
 VISIBILITY_FILE="${TMP_BASE}.visibility"
 OVERVIEW_FILE="${TMP_BASE}.overview"
+STAGES_TMP="${TMP_BASE}.stages"
+RAW_RECORDS_FILE="${TMP_BASE}.raw-records"
+STYLE_FILE="${TMP_BASE}.style"
+CONFIG_INPUT_FILE="${TMP_BASE}.config"
+CACHE_TMP=''
 : > "$CAROUSEL_FILE"
 : > "$DROPDOWN_FILE"
 : > "$TIMELINE_TMP"
 : > "$VISIBILITY_FILE"
 : > "$OVERVIEW_FILE"
-trap 'rm -f "$CAROUSEL_FILE" "$DROPDOWN_FILE" "$SORTED_FILE" "$RECORDS_FILE" "$TIMELINE_TMP" "$VISIBILITY_FILE" "$OVERVIEW_FILE"' EXIT HUP INT TERM
+cleanup() {
+  rm -f "$CAROUSEL_FILE" "$DROPDOWN_FILE" "$SORTED_FILE" "$RECORDS_FILE" "$TIMELINE_TMP" "$VISIBILITY_FILE" "$OVERVIEW_FILE" "$STAGES_TMP" "$RAW_RECORDS_FILE" "$STYLE_FILE" "$CONFIG_INPUT_FILE"
+  if [ -n "$CACHE_TMP" ]; then rm -f "$CACHE_TMP"; fi
+  rmdir "$RUN_DIR" 2>/dev/null || true
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
 
 sanitize_text() {
   # xbar uses | as the parameter delimiter.
-  printf '%s' "$1" | tr '|' '/'
+  printf '%s' "${1//|//}"
 }
 
 swiftbar_escape_attribute() {
   # Attribute values are double-quoted in SwiftBar output.
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+  local escaped="$1"
+  escaped="${escaped//\\/\\\\}"
+  escaped="${escaped//\"/\\\"}"
+  printf '%s' "$escaped"
 }
 
 SCRIPT_ACTION_PATH="$(swiftbar_escape_attribute "$SCRIPT_PATH")"
-
-trim_cr() {
-  printf '%s' "$1" | tr -d '\r'
-}
 
 normalize_tz() {
   case "$1" in
@@ -77,30 +108,60 @@ normalize_tz() {
   esac
 }
 
-display_tz() {
-  case "$1" in
-    AoE|AOE|aoe) printf '%s' 'AoE' ;;
-    *) printf '%s' "$1" ;;
+DATE_IS_GNU=false
+if date --version >/dev/null 2>&1; then DATE_IS_GNU=true; fi
+
+is_gnu_date() { [ "$DATE_IS_GNU" = true ]; }
+
+timezone_file_path() {
+  local tz="$1" zone_dir
+  case "$tz" in
+    ''|/*|*..*|*[!A-Za-z0-9_+/-]*) return 1 ;;
   esac
+  if [ -n "${TZDIR:-}" ]; then
+    [ -f "$TZDIR/$tz" ] || return 1
+    printf '%s' "$TZDIR/$tz"
+    return 0
+  fi
+  # Do not let an unknown TZ silently fall back to UTC. Only installed IANA
+  # zone files (including aliases) and the normalized UTC/AoE names are used.
+  for zone_dir in /usr/share/zoneinfo /var/db/timezone/zoneinfo /usr/share/lib/zoneinfo; do
+    if [ -f "$zone_dir/$tz" ]; then printf '%s' "$zone_dir/$tz"; return 0; fi
+  done
+  return 1
 }
 
-is_gnu_date() {
-  date --version >/dev/null 2>&1
+valid_timezone() {
+  [ "$1" = UTC ] || timezone_file_path "$1" >/dev/null
 }
 
 parse_epoch() {
   # Usage: parse_epoch "2027-04-10 23:59" "AoE"
   local dt="$1"
   local tz_raw="$2"
-  local tz
+  local tz epoch canonical year
   tz="$(normalize_tz "$tz_raw")"
+  valid_timezone "$tz" || return 2
+
+  case "$dt" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]' '[0-9][0-9]:[0-9][0-9]) ;;
+    *) return 1 ;;
+  esac
+  year="${dt%%-*}"
+  [ "$year" != 0000 ] || return 1
 
   if is_gnu_date; then
-    TZ="$tz" date -d "$dt" +%s 2>/dev/null
+    epoch="$(TZ="$tz" date -d "${dt}:00" +%s 2>/dev/null)" || return 1
+    canonical="$(TZ="$tz" date -d "@$epoch" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)" || return 1
   else
-    # BSD date (macOS): TZ determines how the input wall-clock time is interpreted.
-    TZ="$tz" date -j -f '%Y-%m-%d %H:%M' "$dt" '+%s' 2>/dev/null
+    # Explicit seconds avoid BSD date inheriting the current system seconds.
+    epoch="$(TZ="$tz" date -j -f '%Y-%m-%d %H:%M:%S' "${dt}:00" '+%s' 2>/dev/null)" || return 1
+    canonical="$(TZ="$tz" date -r "$epoch" '+%Y-%m-%d %H:%M:%S' 2>/dev/null)" || return 1
   fi
+  # BSD date rolls Feb 30 into March and normalizes nonexistent DST times.
+  # A round trip must match every field, rather than accepting that rollover.
+  [ "$canonical" = "${dt}:00" ] || return 1
+  printf '%s\n' "$epoch"
 }
 
 remaining_text() {
@@ -137,28 +198,6 @@ bool_true() {
     true|TRUE|True|1|yes|YES|Yes) return 0 ;;
     *) return 1 ;;
   esac
-}
-
-format_datetime() {
-  local epoch="$1"
-  local source_datetime="$2"
-  local source_timezone="$3"
-  local converted
-
-  if bool_true "$DISPLAY_LOCAL_TIME"; then
-    if is_gnu_date; then
-      converted="$(date -d "@$epoch" '+%Y-%m-%d %H:%M %Z' 2>/dev/null)"
-    else
-      converted="$(date -r "$epoch" '+%Y-%m-%d %H:%M %Z' 2>/dev/null)"
-    fi
-
-    if [ -n "$converted" ]; then
-      printf '%s' "$converted (local)"
-      return 0
-    fi
-  fi
-
-  printf '%s %s' "$source_datetime" "$(display_tz "$source_timezone")"
 }
 
 format_local_datetime() {
@@ -246,10 +285,34 @@ set_conference_visibility() {
 
 [ -f "$CONFIG_FILE" ] || emit_error "Configuration not found" "Expected: $CONFIG_FILE"
 command -v jq >/dev/null 2>&1 || emit_error "Missing dependency: jq" "Install it with: brew install jq"
+# A single snapshot prevents a preference click/config edit from mixing two
+# versions of the configuration while a refresh is building its cache.
+cp "$CONFIG_FILE" "$CONFIG_INPUT_FILE" || emit_error "Unable to read configuration" "$CONFIG_FILE"
 
 validate_config() {
-  jq -e '
+  jq -e --argjson defaults "$TIMELINE_DEFAULTS" '
     def nonempty_string: type == "string" and length > 0;
+    def integer_between($min; $max): type == "number" and floor == . and . >= $min and . <= $max;
+    def color_pair: type == "string" and test("^#[0-9A-Fa-f]{6}(,#[0-9A-Fa-f]{6})?$");
+    # Restrict markers to single-cell ASCII/box-drawing/geometric glyphs.
+    # Emoji, whitespace and the SwiftBar parameter delimiter break alignment.
+    def glyph: type == "string" and length == 1 and (. as $symbol |
+      (explode[0] as $code | ($code >= 33 and $code <= 126 and $code != 92 and $code != 124) or
+                             ($code >= 9472 and $code <= 9599)) or
+      ("○●△▲▽▼◇◆□■◊◦◎◉◌" | contains($symbol)));
+    def valid_timeline:
+      type == "object" and
+      ($defaults * . | . as $theme |
+        (.min_width | integer_between(16; 500)) and
+        (.max_width | integer_between(16; 500)) and .max_width >= .min_width and
+        (.label_width | integer_between(8; 64)) and
+        (.font | nonempty_string and length <= 80 and
+          all(explode[]; . >= 32 and . != 34 and . != 92 and . != 124 and . != 127)) and
+        (.font_size | integer_between(6; 48)) and
+        (.colors | type == "object" and all(.[]; color_pair)) and
+        (.markers | type == "object" and all(.[]; glyph)) and
+        (.symbols | type == "object" and all(.[]; glyph))
+      );
     .schema_version == 1 and
     (.settings | type == "object") and
     (.settings.warning_days | type == "number" and . >= 0 and floor == .) and
@@ -264,6 +327,8 @@ validate_config() {
     (.settings.show_finished | type == "boolean") and
     (.settings.carousel_limit | type == "number" and . >= 0 and floor == .) and
     (.settings.sort_by_deadline | type == "boolean") and
+    (((.settings | has("cache_dates")) == false) or (.settings.cache_dates | type == "boolean")) and
+    (((.settings | has("timeline")) == false) or (.settings.timeline | valid_timeline)) and
     (.conferences | type == "array" and length > 0) and
     all(.conferences[];
       (.name | nonempty_string) and
@@ -278,10 +343,14 @@ validate_config() {
         (.phase | nonempty_string) and
         (.event | nonempty_string) and
         (.datetime | nonempty_string) and
-        (((. | has("timezone")) == false) or (.timezone | nonempty_string))
+        (((. | has("timezone")) == false) or (.timezone | nonempty_string)) and
+        (((. | has("kind")) == false) or
+          (.kind == "start" or .kind == "end" or .kind == "deadline" or
+           .kind == "notification" or .kind == "milestone")) and
+        (((. | has("phase_after")) == false) or (.phase_after | nonempty_string))
       )
     )
-  ' "$CONFIG_FILE" >/dev/null 2>&1
+  ' "$CONFIG_INPUT_FILE" >/dev/null 2>&1
 }
 
 validate_config || emit_error "Invalid JSON configuration" "Check schema version and required fields in: $CONFIG_FILE"
@@ -307,16 +376,65 @@ SETTINGS_LINE="$(jq -r '[
   (.settings | if has("show_ccf_level") then .show_ccf_level else false end),
   .settings.show_finished,
   .settings.carousel_limit,
-  .settings.sort_by_deadline
-] | @tsv' "$CONFIG_FILE")"
+  .settings.sort_by_deadline,
+  (.settings | if has("cache_dates") then .cache_dates else true end)
+] | @tsv' "$CONFIG_INPUT_FILE")"
 
-IFS=$'\t' read -r WARNING_DAYS URGENT_DAYS IMPORTANT_DAYS DISPLAY_LOCAL_TIME SHOW_PHASE_IN_CAROUSEL SHOW_CCF_LEVEL SHOW_FINISHED CAROUSEL_LIMIT SORT_BY_DEADLINE <<EOF_SETTINGS
+IFS=$'\t' read -r WARNING_DAYS URGENT_DAYS IMPORTANT_DAYS DISPLAY_LOCAL_TIME SHOW_PHASE_IN_CAROUSEL SHOW_CCF_LEVEL SHOW_FINISHED CAROUSEL_LIMIT SORT_BY_DEADLINE CACHE_DATES <<EOF_SETTINGS
 $SETTINGS_LINE
 EOF_SETTINGS
 
+THEME_LINE="$(jq -r --argjson defaults "$TIMELINE_DEFAULTS" '
+  ($defaults * (.settings.timeline // {})) |
+  [.min_width, .max_width, .label_width, .font, .font_size] | @tsv
+' "$CONFIG_INPUT_FILE")"
+IFS=$'\t' read -r TIMELINE_MIN_WIDTH TIMELINE_MAX_WIDTH TIMELINE_LABEL_WIDTH TIMELINE_FONT TIMELINE_FONT_SIZE <<EOF_THEME
+$THEME_LINE
+EOF_THEME
+case "$TIMELINE_FONT" in
+  *[!A-Za-z0-9_-]*) TIMELINE_FONT_ATTRIBUTE="font=\"$(swiftbar_escape_attribute "$TIMELINE_FONT")\"" ;;
+  *) TIMELINE_FONT_ATTRIBUTE="font=$TIMELINE_FONT" ;;
+esac
+TIMELINE_ATTRIBUTES="$TIMELINE_FONT_ATTRIBUTE size=$TIMELINE_FONT_SIZE"
+jq -r --argjson defaults "$TIMELINE_DEFAULTS" '
+  ($defaults * (.settings.timeline // {})) |
+  (.colors | to_entries[] | ["COLOR", .key, .value] | @tsv),
+  (.markers | to_entries[] | ["MARKER", .key, .value] | @tsv),
+  (.symbols | to_entries[] | ["SYMBOL", .key, .value] | @tsv)
+' "$CONFIG_INPUT_FILE" > "$STYLE_FILE"
+
 # Convert the JSON hierarchy to a small record stream once. The remaining
 # state machine stays compatible with the Bash 3.2 bundled with macOS.
+generate_raw_records() {
 jq -r '
+  # One shared mapping drives both the workflow state and chart markers.
+  def marker_phase:
+    (.event | ascii_downcase) as $name |
+    if .phase == "Submit" then
+      if $name | test("abstract") then "Abstract"
+      elif $name | test("paper") then "Full"
+      else "Deadline" end
+    elif $name | test("rebuttal|response|discussion|feedback|interactive") then "Rebuttal"
+    elif $name | test("notification|decision|results|early reject") then "Notification"
+    elif $name | test("revision") then "Revision"
+    elif .phase == "Response" or .phase == "Rebuttal" or
+         .phase == "Discussion" or .phase == "Feedback" then "Rebuttal"
+    elif .phase == "Decision" then "Notification"
+    elif .phase == "Camera" then "Camera Ready"
+    elif .phase == "Waiting" then "Conference"
+    else .phase end;
+  def event_kind($marker):
+    if has("kind") then .kind else
+      (.event | ascii_downcase) as $name |
+      if $name | test("(^|[^a-z])(starts?|begins?|opens?)([^a-z]|$)") then "start"
+      elif $name | test("(^|[^a-z])(ends?|closes?)([^a-z]|$)") then "end"
+      elif $marker == "Notification" then "notification"
+      elif $marker == "Conference" then "start"
+      elif ($name | test("due|deadline")) or
+           $marker == "Abstract" or $marker == "Full" or $marker == "Deadline" or
+           $marker == "Revision" or $marker == "Camera Ready" then "deadline"
+      else "milestone" end
+    end;
   .conferences | to_entries[] |
   .key as $conference_index |
   .value as $conference |
@@ -331,15 +449,144 @@ jq -r '
     ($conference.visible | tostring),
     ($conference_index | tostring)
   ] | @tsv),
-  ($conference.stages[] | [
-    "STAGE",
-    .phase,
-    .event,
-    .datetime,
-    (.timezone // $conference.timezone)
-  ] | @tsv),
+  ($conference.stages[] |
+    marker_phase as $marker |
+    [
+      "STAGE",
+      .phase,
+      .event,
+      .datetime,
+      (.timezone // $conference.timezone),
+      $marker,
+      (if .phase == "Submit" then "Submit" else $marker end),
+      event_kind($marker),
+      (.phase_after // "")
+    ] | @tsv),
   (["END"] | @tsv)
-' "$CONFIG_FILE" > "$RECORDS_FILE" || emit_error "Unable to read JSON configuration" "$CONFIG_FILE"
+' "$CONFIG_INPUT_FILE" > "$RAW_RECORDS_FILE"
+}
+
+build_cached_records() {
+  local raw_line line record raw_phase event dt tz marker phase event_kind after epoch
+  local f1 f2 f3 f4 f5 f6 f7 f8 sequence=0 parse_status source_display local_display local_date display_zone
+  generate_raw_records || return 1
+  : > "$RECORDS_FILE"
+  : > "$STAGES_TMP"
+  while IFS= read -r raw_line; do
+    line="${raw_line//$'\t'/$'\037'}"
+    IFS=$'\037' read -r record f1 f2 f3 f4 f5 f6 f7 f8 <<EOF_CACHE_FIELDS
+$line
+EOF_CACHE_FIELDS
+    case "$record" in
+      CONF)
+        printf '%s\n' "$raw_line" >> "$RECORDS_FILE"
+        sequence=0
+        : > "$STAGES_TMP"
+        ;;
+      STAGE)
+        raw_phase="${f1//|//}"; event="${f2//|//}"; dt="$f3"; tz="$f4"
+        marker="${f5//|//}"; phase="${f6//|//}"; event_kind="$f7"; after="${f8//|//}"
+        if epoch="$(parse_epoch "$dt" "$tz")"; then
+          case "$tz" in AoE|AOE|aoe) display_zone='AoE' ;; *) display_zone="$tz" ;; esac
+          source_display="$dt $display_zone"
+          local_display="$(format_local_datetime "$epoch" '%Y-%m-%d %H:%M %Z')" || return 1
+          local_date="${local_display:0:10}"
+          local_display="$local_display (local)"
+          sequence=$((sequence + 1))
+          printf 'STAGE\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$epoch" "$sequence" "$raw_phase" "$event" "$source_display" "$local_display" "$local_date" "$marker" "$phase" "$event_kind" "$after" >> "$STAGES_TMP"
+        else
+          parse_status=$?
+          printf 'ERROR\t%s\t%s\t%s\t%s\n' "$parse_status" "$event" "$dt" "$tz" >> "$RECORDS_FILE"
+        fi
+        ;;
+      END)
+        # Error records precede sorted stages, so an invalid conference never
+        # acquires a next event before its error is discovered on a cache hit.
+        LC_ALL=C sort -t $'\t' -n -k2,2 -k3,3 "$STAGES_TMP" >> "$RECORDS_FILE" || return 1
+        printf '%s\n' 'END' >> "$RECORDS_FILE"
+        ;;
+    esac
+  done < "$RAW_RECORDS_FILE"
+}
+
+timezone_fingerprint() {
+  local tz path zone_files=()
+  printf 'TZ=%s\nTZDIR=%s\n' "${TZ-<system>}" "${TZDIR-<system>}"
+  if [ -r /etc/localtime ]; then zone_files[${#zone_files[@]}]='/etc/localtime'; fi
+  # A single checksum process covers all relevant source/local zone files.
+  # File contents, not today's UTC offset, invalidate cached DST conversions.
+  while IFS= read -r tz; do
+    case "$tz" in AoE|AOE|aoe) tz='Etc/GMT+12' ;; UTC|utc|GMT|gmt) tz='UTC' ;; esac
+    if path="$(timezone_file_path "$tz")"; then
+      case "$path" in /*) ;; *) path="$PWD/$path" ;; esac
+      zone_files[${#zone_files[@]}]="$path"
+    else
+      printf 'Missing zone: %s\n' "$tz"
+    fi
+  done < <(jq -r '[.conferences[] | .timezone, (.stages[] | .timezone // empty)] +
+                  [(env.TZ // "" | ltrimstr(":"))] | unique[]' "$CONFIG_INPUT_FILE")
+  if [ "${#zone_files[@]}" -gt 0 ]; then cksum "${zone_files[@]}"; fi
+}
+
+cache_debug() {
+  if [ "${CCF_DDL_CACHE_DEBUG:-0}" = 1 ]; then printf 'Date cache: %s\n' "$1" >&2; fi
+}
+
+load_cached_records() {
+  local cache_identity cache_id cache_key config_sum script_sum zone_sum body_sum
+  local tag version saved_key saved_sum
+  local cache_format=1
+  if ! bool_true "$CACHE_DATES"; then
+    build_cached_records || emit_error "Unable to parse conference dates" "$CONFIG_FILE"
+    cache_debug disabled
+    return
+  fi
+
+  case "$CONFIG_FILE" in /*) cache_identity="$CONFIG_FILE" ;; *) cache_identity="$PWD/$CONFIG_FILE" ;; esac
+  cache_id="$(printf '%s' "$cache_identity" | cksum)"
+  cache_id="${cache_id// /-}"
+  if [ -n "${XDG_CACHE_HOME:-}" ]; then
+    CACHE_DIR="$XDG_CACHE_HOME/ccf-ddl"
+  else
+    case "$OSTYPE" in darwin*) CACHE_DIR="$HOME/Library/Caches/ccf-ddl" ;; *) CACHE_DIR="$HOME/.cache/ccf-ddl" ;; esac
+  fi
+  CACHE_DIR="${CCF_DDL_CACHE_DIR:-$CACHE_DIR}"
+  CACHE_FILE="$CACHE_DIR/parsed-${cache_id}.cache"
+  config_sum="$(cksum < "$CONFIG_INPUT_FILE")"
+  script_sum="$(cksum < "$SCRIPT_DIR/$(basename "$0")")"
+  zone_sum="$(timezone_fingerprint | cksum)"
+  cache_key="$(printf '%s\n' "$cache_format" "$cache_identity" "$config_sum" "$script_sum" "$DATE_IS_GNU" "$zone_sum" | cksum)"
+
+  if [ -f "$CACHE_FILE" ] && [ ! -L "$CACHE_FILE" ]; then
+    IFS=$'\t' read -r tag version saved_key saved_sum < "$CACHE_FILE"
+    if [ "$tag" = CCF_DDL_CACHE ] && [ "$version" = "$cache_format" ] && [ "$saved_key" = "$cache_key" ]; then
+      tail -n +2 "$CACHE_FILE" > "$RECORDS_FILE"
+      body_sum="$(cksum < "$RECORDS_FILE")"
+      if [ "$body_sum" = "$saved_sum" ]; then
+        cache_debug hit
+        return
+      fi
+    fi
+  fi
+
+  build_cached_records || emit_error "Unable to parse conference dates" "$CONFIG_FILE"
+  if (umask 077; mkdir -p "$CACHE_DIR") 2>/dev/null; then
+    CACHE_TMP="$(mktemp "$CACHE_DIR/.parsed-${cache_id}.XXXXXX" 2>/dev/null)" || CACHE_TMP=''
+  fi
+  if [ -n "$CACHE_TMP" ]; then
+    body_sum="$(cksum < "$RECORDS_FILE")"
+    if { printf 'CCF_DDL_CACHE\t%s\t%s\t%s\n' "$cache_format" "$cache_key" "$body_sum"; cat "$RECORDS_FILE"; } > "$CACHE_TMP" &&
+       chmod 600 "$CACHE_TMP" && mv -f "$CACHE_TMP" "$CACHE_FILE"; then
+      CACHE_TMP=''
+      cache_debug rebuilt
+      return
+    fi
+  fi
+  # A read-only/unavailable cache never prevents the normal uncached plugin.
+  cache_debug unavailable
+}
+
+load_cached_records
 
 # Current conference state.
 CONF_ACTIVE=false
@@ -352,10 +599,16 @@ CONF_ORDER='0'
 CONF_VISIBLE=true
 CONF_INDEX='0'
 NEXT_FOUND=false
-NEXT_STAGE=''
 NEXT_EVENT=''
 NEXT_DT=''
 NEXT_EPOCH=''
+CURRENT_STAGE=''
+CONF_INVALID=false
+PREVIOUS_EPOCH=''
+PREVIOUS_PHASE=''
+PREVIOUS_KIND=''
+PREVIOUS_AFTER=''
+FIRST_STAGE=true
 VISIBLE_COUNT=0
 CHART_END_EPOCH="$(one_month_later "$NOW_EPOCH")"
 reset_conf() {
@@ -369,11 +622,106 @@ reset_conf() {
   CONF_VISIBLE="$7"
   CONF_INDEX="$8"
   NEXT_FOUND=false
-  NEXT_STAGE=''
   NEXT_EVENT=''
   NEXT_DT=''
   NEXT_EPOCH=''
+  CURRENT_STAGE=''
+  CONF_INVALID=false
+  PREVIOUS_EPOCH=''
+  PREVIOUS_PHASE=''
+  PREVIOUS_KIND=''
+  PREVIOUS_AFTER=''
+  FIRST_STAGE=true
   : > "$TIMELINE_TMP"
+}
+
+phase_before_first_event() {
+  local phase="$1" kind="$2"
+  case "$phase" in
+    Rebuttal|Notification) CURRENT_STAGE='Review' ;;
+    Conference) CURRENT_STAGE='Waiting' ;;
+    *)
+      if [ "$kind" = start ]; then CURRENT_STAGE="Waiting for $phase"
+      else CURRENT_STAGE="$phase"; fi
+      ;;
+  esac
+}
+
+phase_after_event() {
+  local phase="$1" kind="$2" override="$3" current="$4" following_phase="$5" following_kind="$6"
+  if [ -n "$override" ]; then CURRENT_STAGE="$override"; return; fi
+  if [ "$kind" = start ]; then CURRENT_STAGE="$phase"; return; fi
+
+  if [ "$kind" = notification ]; then
+    # A notification is a point in time, not a phase that lasts until the
+    # next milestone. Early/round notifications keep the conference in Review.
+    case "$following_phase" in
+      Revision|"Camera Ready"|Submit)
+        if [ "$following_kind" = start ]; then CURRENT_STAGE="Waiting for $following_phase"
+        else CURRENT_STAGE="$following_phase"; fi
+        ;;
+      Conference) CURRENT_STAGE='Waiting' ;;
+      '') CURRENT_STAGE='Finished' ;;
+      *) CURRENT_STAGE='Review' ;;
+    esac
+    return
+  fi
+
+  if [ "$kind" = end ] || [ "$kind" = deadline ]; then
+    case "$phase" in
+      Submit|Rebuttal|Revision)
+        if [ "$following_phase" = "$phase" ] && [ "$following_kind" != start ]; then
+          CURRENT_STAGE="$current"
+        else
+          case "$following_phase" in
+            Revision|"Camera Ready") phase_before_first_event "$following_phase" "$following_kind" ;;
+            *) CURRENT_STAGE='Review' ;;
+          esac
+        fi
+        ;;
+      "Camera Ready")
+        case "$following_phase" in
+          "Camera Ready") CURRENT_STAGE='Camera Ready' ;;
+          Review|Rebuttal|Notification|Revision) CURRENT_STAGE='Review' ;;
+          *) CURRENT_STAGE='Waiting' ;;
+        esac
+        ;;
+      Conference) CURRENT_STAGE='Waiting' ;;
+      *) CURRENT_STAGE="$current" ;;
+    esac
+    return
+  fi
+  CURRENT_STAGE="$phase"
+}
+
+process_cached_stage() {
+  local epoch="$1" raw_phase="$2" event="$3" source_display="$4" local_display="$5"
+  local local_date="$6" marker="$7" phase="$8" kind="$9" after="${10}" event_display symbol='○'
+  if [ "$FIRST_STAGE" = true ]; then
+    phase_before_first_event "$phase" "$kind"
+    FIRST_STAGE=false
+  fi
+  if [ -n "$PREVIOUS_EPOCH" ] && [ "$PREVIOUS_EPOCH" -le "$NOW_EPOCH" ]; then
+    phase_after_event "$PREVIOUS_PHASE" "$PREVIOUS_KIND" "$PREVIOUS_AFTER" "$CURRENT_STAGE" "$phase" "$kind"
+  fi
+  if bool_true "$DISPLAY_LOCAL_TIME"; then event_display="$local_display"; else event_display="$source_display"; fi
+  if [ "$epoch" -le "$NOW_EPOCH" ]; then
+    symbol='✓'
+  elif [ "$NEXT_FOUND" = false ] && [ "$CONF_INVALID" = false ]; then
+    NEXT_FOUND=true
+    NEXT_EVENT="$event"
+    NEXT_DT="$event_display"
+    NEXT_EPOCH="$epoch"
+    symbol='▶'
+  fi
+  printf '%s\n' "$symbol $event · $event_display" >> "$TIMELINE_TMP"
+  if [ "$CONF_INVALID" = false ] && [ "$epoch" -gt "$NOW_EPOCH" ] && [ "$epoch" -le "$CHART_END_EPOCH" ]; then
+    printf 'EVENT\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$CONF_INDEX" "$epoch" "$raw_phase" "$event" "$local_date" "$marker" "$phase" >> "$OVERVIEW_FILE"
+  fi
+  PREVIOUS_EPOCH="$epoch"
+  PREVIOUS_PHASE="$phase"
+  PREVIOUS_KIND="$kind"
+  PREVIOUS_AFTER="$after"
 }
 
 flush_conf() {
@@ -407,7 +755,22 @@ flush_conf() {
   fi
 
   VISIBLE_COUNT=$((VISIBLE_COUNT + 1))
+  if [ "$CONF_INVALID" = true ]; then CURRENT_STAGE='Unavailable (invalid timeline)'
+  elif [ "$NEXT_FOUND" = false ]; then CURRENT_STAGE='Finished'; fi
   printf 'CONF\t%s\t%s\n' "$CONF_INDEX" "$conference_label" >> "$OVERVIEW_FILE"
+
+  # A malformed timeline must not silently choose another event or disappear
+  # as "finished". Keep its diagnostic details visible until it is repaired.
+  if [ "$CONF_INVALID" = true ]; then
+    printf '%s\n' "$conference_label" >> "$DROPDOWN_FILE"
+    printf '%s\n' "--Current: ${CURRENT_STAGE}" >> "$DROPDOWN_FILE"
+    printf '%s\n' '--Next event: unavailable; fix invalid dates or time zones' >> "$DROPDOWN_FILE"
+    printf '%s\n' '--Timeline' >> "$DROPDOWN_FILE"
+    while IFS= read -r tl; do printf '%s\n' "----${tl}" >> "$DROPDOWN_FILE"; done < "$TIMELINE_TMP"
+    printf '%s\n' '---' >> "$DROPDOWN_FILE"
+    CONF_ACTIVE=false
+    return 0
+  fi
 
   if [ "$NEXT_FOUND" = true ]; then
     local delta remain color top_line epoch_key important_secs
@@ -415,7 +778,7 @@ flush_conf() {
     remain="$(remaining_text "$delta")"
     color="$(status_color "$delta")"
     if bool_true "$SHOW_PHASE_IN_CAROUSEL"; then
-      top_line="${conference_label} · ${NEXT_STAGE}→${NEXT_EVENT} · ${remain}"
+      top_line="${conference_label} · $(sanitize_text "$CURRENT_STAGE")→${NEXT_EVENT} · ${remain}"
     else
       top_line="${conference_label} · ${NEXT_EVENT} · ${remain}"
     fi
@@ -437,9 +800,9 @@ flush_conf() {
     else
       printf '%s\n' "$conference_label" >> "$DROPDOWN_FILE"
     fi
-    printf '%s\n' "--Current: ${NEXT_STAGE}" >> "$DROPDOWN_FILE"
-    printf '%s\n' "--Next: ${NEXT_EVENT}" >> "$DROPDOWN_FILE"
-    printf '%s\n' "--DDL: ${NEXT_DT} · ${remain}" >> "$DROPDOWN_FILE"
+    printf '%s\n' "--Current: $(sanitize_text "$CURRENT_STAGE")" >> "$DROPDOWN_FILE"
+    printf '%s\n' "--Next event: ${NEXT_EVENT}" >> "$DROPDOWN_FILE"
+    printf '%s\n' "--When: ${NEXT_DT} · ${remain}" >> "$DROPDOWN_FILE"
     printf '%s\n' "--Timeline" >> "$DROPDOWN_FILE"
     while IFS= read -r tl; do
       printf '%s\n' "----${tl}" >> "$DROPDOWN_FILE"
@@ -453,6 +816,8 @@ flush_conf() {
         printf '%s\n' "$conference_label" >> "$DROPDOWN_FILE"
       fi
       printf '%s\n' '--Status: finished' >> "$DROPDOWN_FILE"
+      printf '%s\n' '--Current: Finished' >> "$DROPDOWN_FILE"
+      printf '%s\n' '--Next event: none' >> "$DROPDOWN_FILE"
       printf '%s\n' '--Timeline' >> "$DROPDOWN_FILE"
       while IFS= read -r tl; do
         printf '%s\n' "----${tl}" >> "$DROPDOWN_FILE"
@@ -465,56 +830,37 @@ flush_conf() {
 }
 
 while IFS= read -r raw_line || [ -n "$raw_line" ]; do
-  line="$(trim_cr "$raw_line")"
+  line="${raw_line//$'\r'/}"
   case "$line" in
     ''|'#'*) continue ;;
   esac
 
-  IFS=$'\t' read -r kind f1 f2 f3 f4 f5 f6 f7 extra <<EOF_FIELDS
+  # A non-whitespace delimiter preserves empty TSV fields (including url and
+  # optional phase_after), unlike Bash's whitespace-collapsing tab IFS.
+  line="${line//$'\t'/$'\037'}"
+  IFS=$'\037' read -r kind f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 <<EOF_FIELDS
 $line
 EOF_FIELDS
 
   case "$kind" in
     CONF)
       flush_conf
-      reset_conf "$f1" "$f2" "$f3" "$f4" "$f5" "$f6" "$f7" "$extra"
+      reset_conf "$f1" "$f2" "$f3" "$f4" "$f5" "$f6" "$f7" "$f8"
       ;;
 
     STAGE)
       [ "$CONF_ACTIVE" = true ] || continue
       bool_true "$CONF_VISIBLE" || continue
-      stage="$f1"
-      event="$f2"
-      dt="$f3"
-      stage_tz="$f4"
-      event_epoch="$(parse_epoch "$dt" "$stage_tz")"
-      if [ -z "$event_epoch" ]; then
-        printf '%s\n' "⚠ Invalid date: $(sanitize_text "$event") · $(sanitize_text "$dt") $(display_tz "$stage_tz")" >> "$TIMELINE_TMP"
-        continue
-      fi
-      event_display="$(format_datetime "$event_epoch" "$dt" "$stage_tz")"
-      # Store the computer-local calendar date for axis labels. macOS awk does
-      # not provide strftime, and the detail menu can use the source timezone.
-      local_date=''
-      if [ "$event_epoch" -gt "$NOW_EPOCH" ] && [ "$event_epoch" -le "$CHART_END_EPOCH" ]; then
-        local_date="$(format_local_datetime "$event_epoch" '%Y-%m-%d')"
-      fi
-      printf 'EVENT\t%s\t%s\t%s\t%s\t%s\n' "$CONF_INDEX" "$event_epoch" "$stage" "$event" "$local_date" >> "$OVERVIEW_FILE"
+      process_cached_stage "$f1" "$f3" "$f4" "$f5" "$f6" "$f7" "$f8" "$f9" "$f10" "$f11"
+      ;;
 
-      if [ "$event_epoch" -le "$NOW_EPOCH" ]; then
-        printf '%s\n' "✓ $(sanitize_text "$event") · $(sanitize_text "$event_display")" >> "$TIMELINE_TMP"
-      else
-        if [ "$NEXT_FOUND" = false ]; then
-          NEXT_FOUND=true
-          NEXT_STAGE="$(sanitize_text "$stage")"
-          NEXT_EVENT="$(sanitize_text "$event")"
-          NEXT_DT="$(sanitize_text "$event_display")"
-          NEXT_EPOCH="$event_epoch"
-          printf '%s\n' "▶ $(sanitize_text "$event") · $(sanitize_text "$event_display")" >> "$TIMELINE_TMP"
-        else
-          printf '%s\n' "○ $(sanitize_text "$event") · $(sanitize_text "$event_display")" >> "$TIMELINE_TMP"
-        fi
-      fi
+    ERROR)
+      [ "$CONF_ACTIVE" = true ] || continue
+      bool_true "$CONF_VISIBLE" || continue
+      CONF_INVALID=true
+      error_label='Invalid date/time'
+      if [ "$f1" -eq 2 ]; then error_label='Invalid timezone'; fi
+      printf '%s\n' "⚠ ${error_label}: ${f2} · ${f3//|//} ${f4//|//}" >> "$TIMELINE_TMP"
       ;;
 
     END)
@@ -562,50 +908,31 @@ else
   active_count="$(awk -F '\t' -v now="$NOW_EPOCH" -v end="$chart_end" '$1 == "EVENT" && $3 > now && $3 <= end {active[$2]=1} END {for (id in active) count++; print count+0}' "$OVERVIEW_FILE")"
   event_word='milestones'
   if [ "$event_count" -eq 1 ]; then event_word='milestone'; fi
-  echo "--${active_count} active of ${VISIBLE_COUNT} selected · ${event_count} ${event_word} · local time | font=Menlo size=11"
-  echo "--Window: $(format_local_datetime "$NOW_EPOCH" '%Y-%m-%d %H:%M %Z') → $(format_local_datetime "$chart_end" '%Y-%m-%d %H:%M %Z') | font=Menlo size=11"
+  echo "--${active_count} active of ${VISIBLE_COUNT} selected · ${event_count} ${event_word} · local time | $TIMELINE_ATTRIBUTES"
+  echo "--Window: $(format_local_datetime "$NOW_EPOCH" '%Y-%m-%d %H:%M %Z') → $(format_local_datetime "$chart_end" '%Y-%m-%d %H:%M %Z') | $TIMELINE_ATTRIBUTES"
   if [ "$event_count" -eq 0 ]; then
-    echo '--No milestones in the next month for selected conferences | font=Menlo size=11'
+    echo "--No milestones in the next month for selected conferences | $TIMELINE_ATTRIBUTES"
   else
-    awk -F '\t' -v now="$NOW_EPOCH" -v end="$chart_end" '
-    BEGIN { minimum_width = 49; maximum_width = 160 }
-    # Normalize presentation labels only; the JSON and conference detail menus
-    # retain their original phase and event names.
-    function display_phase(raw, event, name) {
-      name = tolower(event)
-      if (raw == "Submit") {
-        if (name ~ /abstract/) return "Abstract"
-        if (name ~ /paper/) return "Full"
-        return "Deadline"
+    awk -F '\t' -v now="$NOW_EPOCH" -v end="$chart_end" \
+        -v minimum_width="$TIMELINE_MIN_WIDTH" -v maximum_width="$TIMELINE_MAX_WIDTH" \
+        -v label_width="$TIMELINE_LABEL_WIDTH" -v attributes="$TIMELINE_ATTRIBUTES" -v style_file="$STYLE_FILE" '
+    BEGIN {
+      while ((getline style_line < style_file) > 0) {
+        split(style_line, fields, "\t")
+        if (fields[1] == "COLOR") colors[fields[2]] = fields[3]
+        if (fields[1] == "MARKER") markers[fields[2]] = fields[3]
+        if (fields[1] == "SYMBOL") symbols[fields[2]] = fields[3]
       }
-      if (name ~ /(rebuttal|response|discussion|feedback|interactive)/) return "Rebuttal"
-      if (name ~ /(notification|decision|results|early reject)/) return "Notification"
-      if (name ~ /revision/) return "Revision"
-      if (raw == "Response" || raw == "Rebuttal" || raw == "Discussion" || raw == "Feedback") return "Rebuttal"
-      if (raw == "Decision") return "Notification"
-      if (raw == "Camera") return "Camera Ready"
-      if (raw == "Waiting") return "Conference"
-      return raw
+      close(style_file)
     }
     function phase_color(phase) {
       # SwiftBar selects the first color in Light and the second in Dark.
       # All Submit milestones share one track/color; their shapes differ.
-      if (phase == "Submit" || phase == "Abstract" || phase == "Full" || phase == "Deadline") return "#124D61,#9ADDEC"
-      if (phase == "Review") return "#394966,#CDD7EF"
-      if (phase == "Rebuttal") return "#6F4500,#FFD789"
-      if (phase == "Notification") return "#10583F,#96E6BB"
-      if (phase == "Camera Ready") return "#3E5360,#C9DBE5"
-      if (phase == "Revision") return "#5B357D,#DCBDF4"
-      if (phase == "Conference") return "#1B4A8D,#AECFFF"
-      return "#45515D,#E0E5EB"
+      if (phase == "Submit" || phase == "Abstract" || phase == "Full" || phase == "Deadline") return colors["Submit"]
+      return phase in colors ? colors[phase] : colors["Default"]
     }
     function marker_shape(phase) {
-      if (phase == "Abstract") return "○"
-      if (phase == "Deadline") return "△"
-      if (phase == "Notification") return "◆"
-      if (phase == "Rebuttal") return "◇"
-      if (phase == "Revision") return "□"
-      return "●"
+      return phase in markers ? markers[phase] : markers["Default"]
     }
     function known_phase(phase) {
       return phase == "Submit" || phase == "Abstract" || phase == "Full" || phase == "Deadline" ||
@@ -614,7 +941,7 @@ else
              phase == "Camera Ready" || phase == "Conference"
     }
     function print_legend(phase) {
-      printf "--%s %s | font=Menlo size=11 color=%s\n", marker_shape(phase), phase, phase_color(phase)
+      printf "--%s %s | %s color=%s\n", marker_shape(phase), phase, attributes, phase_color(phase)
     }
     function short_date(local_date, day) {
       day = substr(local_date, 9, 2) + 0
@@ -664,8 +991,8 @@ else
     $1 == "EVENT" {
       epoch = $3 + 0
       if (epoch > now && epoch <= end) {
-        phase = display_phase($4, $5)
-        track_phase = ($4 == "Submit" ? "Submit" : phase)
+        phase = $7
+        track_phase = $8
         if (!known_phase(phase) && !(phase in extra_seen)) {
           extra_seen[phase] = 1
           extra_phase[++extra_count] = phase
@@ -707,7 +1034,7 @@ else
         tick[position] = 1
         group = event_id[i] SUBSEP event_track_phase[i]
         key = group SUBSEP position
-        if (key in marker) marker[key] = "+"
+        if (key in marker) marker[key] = symbols["overlap"]
         else marker[key] = marker_shape(event_phase[i])
       }
       # The daily case fits on one row after widening. Only extraordinarily
@@ -737,17 +1064,17 @@ else
           date_line = date_line ((key in label_cell) ? label_cell[key] : " ")
         }
         row_label = (row == 1 ? "Date" : "Date " row)
-        printf "--%-15s%s | font=Menlo size=11\n", row_label, date_line
+        printf "--%-*s%s | %s\n", label_width, row_label, date_line, attributes
       }
       axis = ""
       for (column = 0; column <= last; column++) {
-        axis = axis ((column == 0 || column == last || tick[column]) ? "┬" : "─")
+        axis = axis ((column == 0 || column == last || tick[column]) ? symbols["tick"] : symbols["line"])
       }
-      printf "--%-15s%s | font=Menlo size=11 color=#45515D,#E0E5EB\n", "Axis", axis
+      printf "--%-*s%s | %s color=%s\n", label_width, "Axis", axis, attributes, colors["Axis"]
 
       for (i = 1; i <= selected; i++) {
         id = order[i]
-        label = substr(labels[id], 1, 14)
+        label = substr(labels[id], 1, label_width - 1)
         if (!milestones[id]) continue
         for (row = 1; row <= row_count[id]; row++) {
           phase = row_phase[id SUBSEP row]
@@ -755,12 +1082,12 @@ else
           track = ""
           for (column = 0; column <= last; column++) {
             key = group SUBSEP column
-            track = track ((key in marker) ? marker[key] : "─")
+            track = track ((key in marker) ? marker[key] : symbols["line"])
           }
-          printf "--%-15s%s  %s | font=Menlo size=11 color=%s\n", label, track, phase, phase_color(phase)
+          printf "--%-*s%s  %s | %s color=%s\n", label_width, label, track, phase, attributes, phase_color(phase)
         }
       }
-      print "--Legend | font=Menlo size=11"
+      print "--Legend | " attributes
       print_legend("Abstract")
       print_legend("Full")
       print_legend("Deadline")
@@ -771,8 +1098,8 @@ else
       print_legend("Camera Ready")
       print_legend("Conference")
       for (i = 1; i <= extra_count; i++) print_legend(extra_phase[i])
-      print "--+ Overlapping milestones at the same chart position | font=Menlo size=11 color=#45515D,#E0E5EB"
-      print "--Exact dates and times are in each conference menu | font=Menlo size=11 color=#45515D,#E0E5EB"
+      print "--" symbols["overlap"] " Overlapping milestones at the same chart position | " attributes " color=" colors["Axis"]
+      print "--Exact dates and times are in each conference menu | " attributes " color=" colors["Axis"]
     }
     ' "$OVERVIEW_FILE"
   fi

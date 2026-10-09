@@ -18,7 +18,43 @@
     "show_ccf_level": false,
     "show_finished": false,
     "carousel_limit": 0,
-    "sort_by_deadline": true
+    "sort_by_deadline": true,
+    "cache_dates": true,
+    "timeline": {
+      "min_width": 49,
+      "max_width": 160,
+      "label_width": 15,
+      "font": "Menlo",
+      "font_size": 11,
+      "colors": {
+        "Submit": "#124D61,#9ADDEC",
+        "Review": "#394966,#CDD7EF",
+        "Rebuttal": "#6F4500,#FFD789",
+        "Notification": "#10583F,#96E6BB",
+        "Revision": "#5B357D,#DCBDF4",
+        "Camera Ready": "#3E5360,#C9DBE5",
+        "Conference": "#1B4A8D,#AECFFF",
+        "Axis": "#45515D,#E0E5EB",
+        "Default": "#45515D,#E0E5EB"
+      },
+      "markers": {
+        "Abstract": "○",
+        "Full": "●",
+        "Deadline": "△",
+        "Review": "●",
+        "Rebuttal": "◇",
+        "Notification": "◆",
+        "Revision": "□",
+        "Camera Ready": "●",
+        "Conference": "●",
+        "Default": "●"
+      },
+      "symbols": {
+        "line": "─",
+        "tick": "┬",
+        "overlap": "+"
+      }
+    }
   },
   "conferences": [
     {
@@ -143,7 +179,7 @@
       "name": "ACM CCS 2026 Cycle A",
       "short_name": "CCS'26 A",
       "ccf_level": "A",
-      "visible": true,
+      "visible": false,
       "timezone": "AoE",
       "url": "https://www.sigsac.org/ccs/CCS2026/call-for/call-for-papers.html",
       "order": 20,
@@ -194,7 +230,7 @@
       "name": "ACM CCS 2026 Cycle B",
       "short_name": "CCS'26 B",
       "ccf_level": "A",
-      "visible": true,
+      "visible": false,
       "timezone": "AoE",
       "url": "https://www.sigsac.org/ccs/CCS2026/call-for/call-for-papers.html",
       "order": 21,
@@ -942,47 +978,6 @@
           "phase": "Decision",
           "event": "Notification",
           "datetime": "2026-12-08 00:00"
-        }
-      ]
-    },
-    {
-      "name": "ACM International Conference on the Foundations of Software Engineering 2027",
-      "short_name": "FSE'27",
-      "ccf_level": "A",
-      "visible": true,
-      "timezone": "AoE",
-      "url": "https://conf.researchr.org/track/fse-2027/fse-2027-papers",
-      "order": 130,
-      "stages": [
-        {
-          "phase": "Submit",
-          "event": "Paper",
-          "datetime": "2026-10-02 23:59"
-        },
-        {
-          "phase": "Response",
-          "event": "Response Starts",
-          "datetime": "2026-12-14 00:00"
-        },
-        {
-          "phase": "Response",
-          "event": "Response Ends",
-          "datetime": "2026-12-18 23:59"
-        },
-        {
-          "phase": "Decision",
-          "event": "Initial Notification",
-          "datetime": "2027-01-22 00:00"
-        },
-        {
-          "phase": "Revision",
-          "event": "Revision Due",
-          "datetime": "2027-03-05 23:59"
-        },
-        {
-          "phase": "Decision",
-          "event": "Final Notification",
-          "datetime": "2027-03-31 00:00"
         }
       ]
     }
