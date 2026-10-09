@@ -13,6 +13,7 @@ A macOS [SwiftBar](https://github.com/swiftbar/SwiftBar) and [xbar](https://xbar
 - Supports AoE, UTC, and other IANA time zones, including per-event overrides.
 - Can automatically convert every conference event to the computer's local time zone.
 - Marks completed, current, and future timeline events automatically.
+- Shows a combined, color-coded timeline of selected conferences' events in the next calendar month.
 - Uses red and orange colors for urgent and approaching dates.
 - Supports deadline-based or configured ordering and an optional carousel limit.
 - Provides official conference links and complete timelines in the dropdown menu.
@@ -163,7 +164,29 @@ Open the plugin menu and expand **Conference Visibility**. It always contains ev
 - click a checked conference to hide it;
 - click an unchecked conference to show it again.
 
-The visibility checklist and conference headings use `short_name`, such as `NeurIPS'26` or `ICSE'27`, to keep the menu compact. Set `show_ccf_level` to `true` to prefix these labels with values such as `[CCF-A]`. Hover over an item to see its full conference name. Each click atomically updates that conference's `visible` value in the active JSON configuration and asks SwiftBar to refresh the plugin. The selector itself remains available even when every conference is hidden.
+The visibility checklist and conference headings use `short_name`, such as `NeurIPS'26` or `ICSE'27`, to keep the menu compact. Set `show_ccf_level` to `true` to prefix these labels with values such as `[CCF-A]`. Hover over a visibility checklist item to see its full conference name. Conference headings omit the hover tooltip so it cannot cover the `Current` line in their submenus. Each click atomically updates that conference's `visible` value in the active JSON configuration and asks SwiftBar to refresh the plugin. The selector itself remains available even when every conference is hidden.
+
+### Combined Timeline Overview
+
+Expand **Timeline Overview** for a horizontal, CCF Cycle-inspired timeline. All conferences checked in **Conference Visibility** share one date axis. A marker's horizontal position is proportional to its actual time between the current moment and the same local clock time one calendar month later. Past dates are not plotted, and selected conferences with no milestone in this window are omitted from the chart (they remain selected in **Conference Visibility**). If a conference has milestones in different display phases, it gets adjacent tracks on the same axis.
+
+The chart uses a display-only mapping; the original JSON phases and event names are unchanged. All submission milestones for a conference share one `Submit` track, while the marker and legend distinguish their event types:
+
+| Configured phase or event | Track label | Marker / legend |
+| --- | --- | --- |
+| `Submit` event named `Abstract` | Submit | `○` Abstract |
+| `Submit` event named `Paper` or `Full Paper` | Submit | `●` Full |
+| Other `Submit` events, such as Registration or Artifacts | Submit | `△` Deadline |
+| `Review` | Review | `●` Review |
+| `Response`, `Rebuttal`, `Discussion`, `Feedback`, or an event named for one of these windows | Rebuttal | `◇` Rebuttal |
+| `Decision` or an event named Notification/Decision/Results | Notification | `◆` Notification |
+| `Camera` | Camera Ready | `●` Camera Ready |
+| `Revision` or a revision event | Revision | `□` Revision |
+| `Waiting` | Conference | `●` Conference |
+
+Outside the Submit phase, event names take precedence where they clarify a broad configured phase: for example, `Round 2 Notification` is shown as Notification even if its configured phase is Review, while `Reviews / Discussion Starts` is shown as Rebuttal. A later `Final Paper` under the Camera phase remains Camera Ready. The Submit row and its three legend items share the same teal-blue color, so the legend accurately matches the chart; `○`, `●`, and `△` distinguish Abstract, Full, and other submission deadlines. Other tracks use distinct phase colors. Each `color=light,dark` pair uses a darker hue on light menus and a pale hue on dark menus. SwiftBar colors an entire menu row, so separate colors for markers within one Submit row are not supported without inline ANSI formatting. The complete legend is below the chart. `+` means multiple milestones landed at the same position on one track. If macOS temporarily dims the entire menu, including uncolored text, a plugin palette cannot override that system-wide effect.
+
+Every plotted milestone position gets a tick and a computer-local date label above the axis. The axis grows just enough to keep date labels on one row, including a synthetic test with a milestone every day of a 31-day month. Its width is capped so an extremely clustered set of events cannot make the SwiftBar menu arbitrarily wide; only that exceptional case can require another date row. Labels normally show just the day number; if the same number occurs in two months within the window, both labels include the month (for example, `2/1` and `3/1`). The `Date` and `Axis` prefixes keep the scale aligned with the conference tracks in SwiftBar, which trims leading spaces. Open an individual conference below the chart for exact local timestamps and event names. Toggling a conference updates the chart after SwiftBar refreshes the plugin.
 
 ### Date-Only Time Convention
 
@@ -273,6 +296,17 @@ Check the Bash syntax:
 
 ```bash
 bash -n ccf-ddl.1m.sh
+```
+
+Run the timeline regression test. It uses a fixed clock and synthetic daily
+milestones across both 28- and 31-day months, checks that their labels fit on
+one row and every node survives, verifies the shared Submit track and its
+Abstract/Full/Deadline markers and legend, checks light/dark color contrast
+against representative menu backgrounds, and confirms that empty conference
+tracks are hidden:
+
+```bash
+bash tests/test_timeline_overview.sh
 ```
 
 Inspect the generated xbar output:
