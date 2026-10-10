@@ -1,6 +1,6 @@
 #!/bin/bash
 # <xbar.title>CCF Conference Deadlines</xbar.title>
-# <xbar.version>3.9</xbar.version>
+# <xbar.version>3.13</xbar.version>
 # <xbar.author>OpenAI</xbar.author>
 # <xbar.desc>SwiftBar/xbar conference deadlines with selectable conferences, time-zone conversion, and full timelines.</xbar.desc>
 # <xbar.dependencies>bash,jq</xbar.dependencies>
@@ -42,20 +42,48 @@ CACHE_DATES=true
 # One fallback theme for older configs; individual entries can be overridden.
 TIMELINE_DEFAULTS='{
   "min_width": 49, "max_width": 160, "label_width": 15,
-  "font": "Menlo", "font_size": 11,
+  "font": "Menlo", "font_size": 11, "marker_version": 3,
   "colors": {
-    "Submit": "#124D61,#9ADDEC", "Review": "#394966,#CDD7EF",
-    "Rebuttal": "#6F4500,#FFD789", "Notification": "#10583F,#96E6BB",
-    "Revision": "#5B357D,#DCBDF4", "Camera Ready": "#3E5360,#C9DBE5",
+    "Submit": "#8A3D0A,#FFBD8A", "Review": "#65358A,#DDBAF6",
+    "Rebuttal": "#705000,#F8D77C", "Decision": "#10583F,#96E6BB",
+    "Revision": "#8A345A,#F4B4D3", "Camera Ready": "#00616A,#91DFE5",
     "Conference": "#1B4A8D,#AECFFF", "Axis": "#45515D,#E0E5EB",
     "Default": "#45515D,#E0E5EB"
   },
   "markers": {
     "Abstract": "○", "Full": "●", "Deadline": "△", "Review": "●",
-    "Rebuttal": "◇", "Notification": "◆", "Revision": "□",
-    "Camera Ready": "●", "Conference": "●", "Default": "●"
+    "Early Reject": "△", "Round Update": "○", "Review Discussion": "□",
+    "Rebuttal": "◊", "Rebuttal Start": "◇", "Rebuttal End": "◆", "Rebuttal Due": "△",
+    "Decision": "◉", "Initial Decision": "◇", "Final Decision": "◆", "Revision Decision": "□",
+    "Revision": "◌", "Minor Revision": "○", "Major Revision": "□", "Revision Due": "△",
+    "Camera Ready": "●", "Conference": "●", "Default": "?"
   },
   "symbols": {"line": "─", "tick": "┬", "overlap": "+"}
+}'
+# Legacy default themes upgrade in memory, never rewriting conference data or
+# visibility. Non-default custom symbols/colors remain configurable.
+TIMELINE_LEGACY_MARKERS='{
+  "Abstract":"○", "Full":"●", "Deadline":"△", "Review":"●",
+  "Early Reject":"△", "Round Update":"○", "Review Discussion":"□",
+  "Rebuttal":"◇", "Rebuttal Start":"◇", "Rebuttal End":"◆", "Rebuttal Due":"△",
+  "Decision":"◆", "Notification":"◆", "Initial Decision":"◇", "Final Decision":"◆", "Revision Decision":"□",
+  "Revision":"□", "Minor Revision":"○", "Major Revision":"□", "Revision Due":"△",
+  "Camera Ready":"●", "Conference":"●", "Default":"●"
+}'
+TIMELINE_CODE_MARKERS='{
+  "Abstract":"AB", "Full":"FL", "Deadline":"DL", "Review":"RV",
+  "Early Reject":"ER", "Round Update":"RU", "Review Discussion":"DS",
+  "Rebuttal":"RB", "Rebuttal Start":"RS", "Rebuttal End":"RE", "Rebuttal Due":"RD",
+  "Decision":"DN", "Initial Decision":"DI", "Final Decision":"DF", "Revision Decision":"DR",
+  "Revision":"RX", "Minor Revision":"MI", "Major Revision":"MA", "Revision Due":"VD",
+  "Camera Ready":"CR", "Conference":"CF", "Default":"?"
+}'
+TIMELINE_LEGACY_COLORS='{
+  "Submit":"#124D61,#9ADDEC", "Review":"#394966,#CDD7EF",
+  "Rebuttal":"#6F4500,#FFD789", "Decision":"#10583F,#96E6BB",
+  "Revision":"#5B357D,#DCBDF4", "Camera Ready":"#3E5360,#C9DBE5",
+  "Conference":"#1B4A8D,#AECFFF", "Axis":"#45515D,#E0E5EB",
+  "Default":"#45515D,#E0E5EB"
 }'
 
 RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ccf-ddl.XXXXXX")" || exit 1
@@ -300,6 +328,9 @@ validate_config() {
       (explode[0] as $code | ($code >= 33 and $code <= 126 and $code != 92 and $code != 124) or
                              ($code >= 9472 and $code <= 9599)) or
       ("○●△▲▽▼◇◆□■◊◦◎◉◌" | contains($symbol)));
+    # Two ASCII letters/digits form a readable node code, without introducing
+    # wide glyphs or changing the single-cell axis/overlap symbols.
+    def marker: glyph or (type == "string" and test("^[A-Za-z0-9]{2}$"));
     def valid_timeline:
       type == "object" and
       ($defaults * . | . as $theme |
@@ -309,8 +340,9 @@ validate_config() {
         (.font | nonempty_string and length <= 80 and
           all(explode[]; . >= 32 and . != 34 and . != 92 and . != 124 and . != 127)) and
         (.font_size | integer_between(6; 48)) and
+        (.marker_version | integer_between(1; 3)) and
         (.colors | type == "object" and all(.[]; color_pair)) and
-        (.markers | type == "object" and all(.[]; glyph)) and
+        (.markers | type == "object" and all(.[]; marker)) and
         (.symbols | type == "object" and all(.[]; glyph))
       );
     .schema_version == 1 and
@@ -347,6 +379,8 @@ validate_config() {
         (((. | has("kind")) == false) or
           (.kind == "start" or .kind == "end" or .kind == "deadline" or
            .kind == "notification" or .kind == "milestone")) and
+        (((. | has("audience")) == false) or
+          (.audience == "authors" or .audience == "reviewers")) and
         (((. | has("phase_after")) == false) or (.phase_after | nonempty_string))
       )
     )
@@ -384,57 +418,131 @@ IFS=$'\t' read -r WARNING_DAYS URGENT_DAYS IMPORTANT_DAYS DISPLAY_LOCAL_TIME SHO
 $SETTINGS_LINE
 EOF_SETTINGS
 
-THEME_LINE="$(jq -r --argjson defaults "$TIMELINE_DEFAULTS" '
-  ($defaults * (.settings.timeline // {})) |
-  [.min_width, .max_width, .label_width, .font, .font_size] | @tsv
-' "$CONFIG_INPUT_FILE")"
-IFS=$'\t' read -r TIMELINE_MIN_WIDTH TIMELINE_MAX_WIDTH TIMELINE_LABEL_WIDTH TIMELINE_FONT TIMELINE_FONT_SIZE <<EOF_THEME
-$THEME_LINE
-EOF_THEME
-case "$TIMELINE_FONT" in
-  *[!A-Za-z0-9_-]*) TIMELINE_FONT_ATTRIBUTE="font=\"$(swiftbar_escape_attribute "$TIMELINE_FONT")\"" ;;
-  *) TIMELINE_FONT_ATTRIBUTE="font=$TIMELINE_FONT" ;;
-esac
-TIMELINE_ATTRIBUTES="$TIMELINE_FONT_ATTRIBUTE size=$TIMELINE_FONT_SIZE"
-jq -r --argjson defaults "$TIMELINE_DEFAULTS" '
-  ($defaults * (.settings.timeline // {})) |
+# Merge once. Known old defaults (v1 icons or v2 codes/palette) upgrade to the
+# colored-icon theme. Explicit v3 node overrides win, including custom glyphs.
+jq -r --argjson defaults "$TIMELINE_DEFAULTS" --argjson legacy "$TIMELINE_LEGACY_MARKERS" \
+      --argjson codes "$TIMELINE_CODE_MARKERS" --argjson old_colors "$TIMELINE_LEGACY_COLORS" '
+  (.settings.timeline // {}) as $overrides |
+  ($overrides.marker_version // 1) as $version |
+  ($version == 1) as $legacy_theme |
+  ($overrides.markers // {} |
+    if $legacy_theme then
+      with_entries(select(. as $entry | $legacy[$entry.key] != $entry.value))
+    elif $version == 2 then
+      with_entries(select(. as $entry | $codes[$entry.key] != $entry.value))
+    else . end |
+    if ($overrides.markers // {} | has("Decision")) then .
+    elif has("Notification") then . + {Decision: .Notification}
+    else . end) as $marker_overrides |
+  ($overrides.colors // {} |
+    if $version < 3 then
+      with_entries(select(. as $entry | $old_colors[$entry.key] != $entry.value))
+    else . end) as $color_overrides |
+  ($defaults * $overrides) |
+  .colors = ($defaults.colors * $color_overrides) |
+  if (($overrides.colors // {} | has("Decision")) | not) and
+     ($color_overrides | has("Notification"))
+  then .colors.Decision = $color_overrides.Notification else . end |
+  .markers = ($defaults.markers * $marker_overrides) |
+  reduce [
+    {phase: "Review", nodes: ["Early Reject", "Round Update", "Review Discussion"]},
+    {phase: "Rebuttal", nodes: ["Rebuttal Start", "Rebuttal End", "Rebuttal Due"]},
+    {phase: "Decision", nodes: ["Initial Decision", "Final Decision", "Revision Decision"]},
+    {phase: "Revision", nodes: ["Minor Revision", "Major Revision", "Revision Due"]}
+  ][] as $family (.;
+    if $legacy_theme and ($marker_overrides | has($family.phase)) and
+       $marker_overrides[$family.phase] != $defaults.markers[$family.phase] then
+      reduce $family.nodes[] as $node (.;
+        if $marker_overrides | has($node) then .
+        else .markers[$node] = $marker_overrides[$family.phase] end)
+    else . end) |
+  ([.min_width, .max_width, .label_width, .font, .font_size] | @tsv),
   (.colors | to_entries[] | ["COLOR", .key, .value] | @tsv),
   (.markers | to_entries[] | ["MARKER", .key, .value] | @tsv),
   (.symbols | to_entries[] | ["SYMBOL", .key, .value] | @tsv)
 ' "$CONFIG_INPUT_FILE" > "$STYLE_FILE"
 
+# The first record is the layout; the chart reader ignores it.
+IFS=$'\t' read -r TIMELINE_MIN_WIDTH TIMELINE_MAX_WIDTH TIMELINE_LABEL_WIDTH TIMELINE_FONT TIMELINE_FONT_SIZE < "$STYLE_FILE"
+case "$TIMELINE_FONT" in
+  *[!A-Za-z0-9_-]*) TIMELINE_FONT_ATTRIBUTE="font=\"$(swiftbar_escape_attribute "$TIMELINE_FONT")\"" ;;
+  *) TIMELINE_FONT_ATTRIBUTE="font=$TIMELINE_FONT" ;;
+esac
+TIMELINE_ATTRIBUTES="$TIMELINE_FONT_ATTRIBUTE size=$TIMELINE_FONT_SIZE"
+
 # Convert the JSON hierarchy to a small record stream once. The remaining
 # state machine stays compatible with the Bash 3.2 bundled with macOS.
 generate_raw_records() {
 jq -r '
-  # One shared mapping drives both the workflow state and chart markers.
-  def marker_phase:
+  # Keep workflow groups, event roles, and marker types separate. Both the
+  # current-stage engine and the chart consume these same classifications.
+  def early_reject:
+    .event | ascii_downcase | test("early[ -]?reject|reject.*notification|notification.*reject");
+  def internal_discussion:
     (.event | ascii_downcase) as $name |
-    if .phase == "Submit" then
-      if $name | test("abstract") then "Abstract"
-      elif $name | test("paper") then "Full"
-      else "Deadline" end
+    (.phase | ascii_downcase) as $phase |
+    (($name + " " + $phase) | test("discussion|meta[ -]?review")) and
+    (.audience == "reviewers" or
+      (.audience != "authors" and
+        (($name + " " + $phase) | test("internal|private|reviewer.*(area chair|(^|[^a-z])ac([^a-z]|$))|meta[ -]?review"))));
+  def stage_group:
+    (.event | ascii_downcase) as $name |
+    if .phase == "Submit" then "Submit"
+    elif internal_discussion then "Review"
+    # Combined results/response-start events open the authors response window.
     elif $name | test("rebuttal|response|discussion|feedback|interactive") then "Rebuttal"
-    elif $name | test("notification|decision|results|early reject") then "Notification"
-    elif $name | test("revision") then "Revision"
+    elif early_reject then "Review"
+    elif ($name | test("round.*(notification|result|update)|reviews.*released")) then "Review"
+    elif .phase == "Decision" or .phase == "Notification" or
+         ($name | test("initial.*(notification|decision)|final.*(notification|decision)|revision.*(notification|decision)")) then "Decision"
+    elif .phase == "Review" and ($name | test("notification|results")) then "Review"
+    elif $name | test("notification|decision|results") then "Decision"
+    # Revision Camera/Final Paper are final-version tasks, not a new revision.
+    elif $name | test("camera|final version|final paper") then "Camera Ready"
+    elif .phase == "Revision" or ($name | test("revision|shepherd")) then "Revision"
     elif .phase == "Response" or .phase == "Rebuttal" or
          .phase == "Discussion" or .phase == "Feedback" then "Rebuttal"
-    elif .phase == "Decision" then "Notification"
     elif .phase == "Camera" then "Camera Ready"
     elif .phase == "Waiting" then "Conference"
     else .phase end;
-  def event_kind($marker):
+  def event_kind($group):
     if has("kind") then .kind else
       (.event | ascii_downcase) as $name |
       if $name | test("(^|[^a-z])(starts?|begins?|opens?)([^a-z]|$)") then "start"
       elif $name | test("(^|[^a-z])(ends?|closes?)([^a-z]|$)") then "end"
-      elif $marker == "Notification" then "notification"
-      elif $marker == "Conference" then "start"
+      elif $group == "Decision" or
+           ($group == "Review" and ($name | test("notification|results|reviews.*released"))) then "notification"
+      elif $group == "Conference" then "start"
       elif ($name | test("due|deadline")) or
-           $marker == "Abstract" or $marker == "Full" or $marker == "Deadline" or
-           $marker == "Revision" or $marker == "Camera Ready" then "deadline"
+           $group == "Submit" or $group == "Revision" or $group == "Camera Ready" then "deadline"
       else "milestone" end
     end;
+  def marker_phase($group; $kind):
+    (.event | ascii_downcase) as $name |
+    if $group == "Submit" then
+      if $name | test("abstract") then "Abstract"
+      elif $name | test("paper|(^|[^a-z])full([^a-z]|$)") then "Full"
+      else "Deadline" end
+    elif $group == "Review" then
+      if early_reject then "Early Reject"
+      elif internal_discussion then "Review Discussion"
+      elif $name | test("round|notification|results") then "Round Update"
+      else "Review" end
+    elif $group == "Rebuttal" then
+      if $kind == "start" then "Rebuttal Start"
+      elif $kind == "end" then "Rebuttal End"
+      elif $kind == "deadline" then "Rebuttal Due"
+      else "Rebuttal" end
+    elif $group == "Decision" then
+      if $name | test("revision") then "Revision Decision"
+      elif $name | test("initial") then "Initial Decision"
+      else "Final Decision" end
+    elif $group == "Revision" then
+      if $name | test("minor") then "Minor Revision"
+      elif $name | test("major") then "Major Revision"
+      elif $kind == "deadline" then "Revision Due"
+      else "Revision" end
+    else $group end;
   .conferences | to_entries[] |
   .key as $conference_index |
   .value as $conference |
@@ -450,7 +558,9 @@ jq -r '
     ($conference_index | tostring)
   ] | @tsv),
   ($conference.stages[] |
-    marker_phase as $marker |
+    stage_group as $group |
+    event_kind($group) as $kind |
+    marker_phase($group; $kind) as $marker |
     [
       "STAGE",
       .phase,
@@ -458,8 +568,8 @@ jq -r '
       .datetime,
       (.timezone // $conference.timezone),
       $marker,
-      (if .phase == "Submit" then "Submit" else $marker end),
-      event_kind($marker),
+      $group,
+      $kind,
       (.phase_after // "")
     ] | @tsv),
   (["END"] | @tsv)
@@ -638,7 +748,7 @@ reset_conf() {
 phase_before_first_event() {
   local phase="$1" kind="$2"
   case "$phase" in
-    Rebuttal|Notification) CURRENT_STAGE='Review' ;;
+    Rebuttal|Decision) CURRENT_STAGE='Review' ;;
     Conference) CURRENT_STAGE='Waiting' ;;
     *)
       if [ "$kind" = start ]; then CURRENT_STAGE="Waiting for $phase"
@@ -654,7 +764,8 @@ phase_after_event() {
 
   if [ "$kind" = notification ]; then
     # A notification is a point in time, not a phase that lasts until the
-    # next milestone. Early/round notifications keep the conference in Review.
+    # next milestone. Early/round review updates do not imply a paper outcome.
+    if [ "$phase" != Decision ]; then CURRENT_STAGE='Review'; return; fi
     case "$following_phase" in
       Revision|"Camera Ready"|Submit)
         if [ "$following_kind" = start ]; then CURRENT_STAGE="Waiting for $following_phase"
@@ -682,7 +793,7 @@ phase_after_event() {
       "Camera Ready")
         case "$following_phase" in
           "Camera Ready") CURRENT_STAGE='Camera Ready' ;;
-          Review|Rebuttal|Notification|Revision) CURRENT_STAGE='Review' ;;
+          Review|Rebuttal|Decision|Revision) CURRENT_STAGE='Review' ;;
           *) CURRENT_STAGE='Waiting' ;;
         esac
         ;;
@@ -927,21 +1038,93 @@ else
     }
     function phase_color(phase) {
       # SwiftBar selects the first color in Light and the second in Dark.
-      # All Submit milestones share one track/color; their shapes differ.
+      # Color identifies the group; shape identifies the node within it.
       if (phase == "Submit" || phase == "Abstract" || phase == "Full" || phase == "Deadline") return colors["Submit"]
       return phase in colors ? colors[phase] : colors["Default"]
     }
-    function marker_shape(phase) {
+    function marker_token(phase) {
       return phase in markers ? markers[phase] : markers["Default"]
     }
+    function marker_width(token) {
+      # Avoid depending on awk UTF-8 length handling for single-cell glyphs.
+      return token ~ /^[A-Za-z0-9][A-Za-z0-9]$/ ? 2 : 1
+    }
+    function marker_start(position, token, candidate, start, cells) {
+      cells = marker_width(token)
+      start = position - int(cells / 2)
+      if (start < 0) start = 0
+      if (start + cells > candidate) start = candidate - cells
+      return start
+    }
+    function build_track(group, candidate, key, position, token, start, cells, offset, previous_end, previous_position, track) {
+      for (key in track_cell) delete track_cell[key]
+      for (key in crowded) delete crowded[key]
+      previous_end = previous_position = -1
+      # A capped axis can make nearby multi-cell nodes collide. Collapse whole
+      # tokens, never half a code, and keep their actual anchor positions.
+      for (position = 0; position < candidate; position++) {
+        key = group SUBSEP position
+        if (!(key in marker)) continue
+        token = marker[key]
+        start = marker_start(position, token, candidate)
+        cells = marker_width(token)
+        if (start <= previous_end) {
+          crowded[position] = crowded[previous_position] = 1
+        }
+        previous_end = start + cells - 1
+        previous_position = position
+      }
+      for (position = 0; position < candidate; position++) {
+        key = group SUBSEP position
+        if (!(key in marker)) continue
+        token = crowded[position] ? symbols["overlap"] : marker[key]
+        cells = marker_width(token)
+        start = marker_start(position, token, candidate)
+        for (offset = 0; offset < cells; offset++) {
+          track_cell[start + offset] = cells == 1 ? token : substr(token, offset + 1, 1)
+        }
+      }
+      track = ""
+      for (position = 0; position < candidate; position++) {
+        track = track ((position in track_cell) ? track_cell[position] : symbols["line"])
+      }
+      return track
+    }
     function known_phase(phase) {
-      return phase == "Submit" || phase == "Abstract" || phase == "Full" || phase == "Deadline" ||
+      return phase == "Submit" ||
              phase == "Review" || phase == "Rebuttal" ||
-             phase == "Notification" || phase == "Revision" ||
+             phase == "Decision" || phase == "Revision" ||
              phase == "Camera Ready" || phase == "Conference"
     }
-    function print_legend(phase) {
-      printf "--%s %s | %s color=%s\n", marker_shape(phase), phase, attributes, phase_color(phase)
+    function legend_node(node, label) {
+      return marker_token(node) " " (label == "" ? node : label)
+    }
+    function print_legend(phase, text) {
+      # Match the chart tracks: one row per phase, with its node types inline.
+      if (phase == "Submit") {
+        text = phase " · " legend_node("Abstract") " · " legend_node("Full") " · " legend_node("Deadline")
+      } else if (phase == "Review") {
+        text = phase " · " legend_node("Review", "Reviews") " · " legend_node("Early Reject") \
+               " · " legend_node("Round Update") " · " legend_node("Review Discussion", "Discussion")
+      } else if (phase == "Rebuttal") {
+        text = phase " · " legend_node("Rebuttal Start", "Starts") " · " legend_node("Rebuttal End", "Ends") \
+               " · " legend_node("Rebuttal Due", "Due")
+        if (used_marker["Rebuttal"]) text = text " · " legend_node("Rebuttal", "Other")
+      } else if (phase == "Decision") {
+        text = phase " · " legend_node("Initial Decision", "Initial") " · " legend_node("Final Decision", "Final") \
+               " · " legend_node("Revision Decision", "Revision Result")
+      } else if (phase == "Revision") {
+        text = phase " · " legend_node("Minor Revision", "Minor") " · " legend_node("Major Revision", "Major") \
+               " · " legend_node("Revision Due", "Due")
+        if (used_marker["Revision"]) text = text " · " legend_node("Revision", "Other")
+      } else if (phase == "Camera Ready") {
+        text = phase " · " legend_node(phase, "Final Version")
+      } else if (phase == "Conference") {
+        text = phase " · " legend_node(phase, "Start")
+      } else {
+        text = marker_token(phase) " " phase
+      }
+      printf "--%s | %s color=%s\n", text, attributes, phase_color(phase)
     }
     function short_date(local_date, day) {
       day = substr(local_date, 9, 2) + 0
@@ -956,10 +1139,12 @@ else
     }
     # Find the narrowest proportional axis whose centered date labels all fit
     # on one row. A capped width avoids an unusably wide SwiftBar menu.
-    function axis_fits(candidate, key, i, position, local_date, date_key, n, label_text, label_length, start, previous_end) {
+    function axis_fits(candidate, key, i, position, local_date, date_key, n, label_text, label_length, start, previous_end, group, token, cells, offset, nodes_fit) {
       for (key in trial_seen) delete trial_seen[key]
       for (key in trial_count) delete trial_count[key]
       for (key in trial_at) delete trial_at[key]
+      for (key in trial_node_epoch) delete trial_node_epoch[key]
+      nodes_fit = 1
       for (i = 1; i <= event_total; i++) {
         position = plot_position(event_epoch[i], candidate - 1)
         local_date = event_date[i]
@@ -968,6 +1153,15 @@ else
           trial_seen[date_key] = 1
           trial_count[position]++
           trial_at[position SUBSEP trial_count[position]] = local_date
+        }
+        group = event_id[i] SUBSEP event_track_phase[i]
+        token = marker_token(event_phase[i])
+        cells = marker_width(token)
+        start = marker_start(position, token, candidate)
+        for (offset = 0; offset < cells; offset++) {
+          key = group SUBSEP (start + offset)
+          if ((key in trial_node_epoch) && trial_node_epoch[key] != event_epoch[i]) nodes_fit = 0
+          trial_node_epoch[key] = event_epoch[i]
         }
       }
       previous_end = -2
@@ -982,7 +1176,7 @@ else
           previous_end = start + label_length - 1
         }
       }
-      return 1
+      return nodes_fit
     }
     $1 == "CONF" {
       labels[$2] = $3
@@ -993,10 +1187,11 @@ else
       if (epoch > now && epoch <= end) {
         phase = $7
         track_phase = $8
-        if (!known_phase(phase) && !(phase in extra_seen)) {
-          extra_seen[phase] = 1
-          extra_phase[++extra_count] = phase
+        if (!known_phase(track_phase) && !(track_phase in extra_seen)) {
+          extra_seen[track_phase] = 1
+          extra_phase[++extra_count] = track_phase
         }
+        used_marker[phase] = 1
         event_total++
         event_epoch[event_total] = epoch
         event_id[event_total] = $2
@@ -1035,7 +1230,7 @@ else
         group = event_id[i] SUBSEP event_track_phase[i]
         key = group SUBSEP position
         if (key in marker) marker[key] = symbols["overlap"]
-        else marker[key] = marker_shape(event_phase[i])
+        else marker[key] = marker_token(event_phase[i])
       }
       # The daily case fits on one row after widening. Only extraordinarily
       # clustered dates beyond the width cap need an additional date row.
@@ -1079,26 +1274,20 @@ else
         for (row = 1; row <= row_count[id]; row++) {
           phase = row_phase[id SUBSEP row]
           group = id SUBSEP phase
-          track = ""
-          for (column = 0; column <= last; column++) {
-            key = group SUBSEP column
-            track = track ((key in marker) ? marker[key] : symbols["line"])
-          }
+          track = build_track(group, width)
           printf "--%-*s%s  %s | %s color=%s\n", label_width, label, track, phase, attributes, phase_color(phase)
         }
       }
       print "--Legend | " attributes
-      print_legend("Abstract")
-      print_legend("Full")
-      print_legend("Deadline")
+      print_legend("Submit")
       print_legend("Review")
       print_legend("Rebuttal")
-      print_legend("Notification")
+      print_legend("Decision")
       print_legend("Revision")
       print_legend("Camera Ready")
       print_legend("Conference")
       for (i = 1; i <= extra_count; i++) print_legend(extra_phase[i])
-      print "--" symbols["overlap"] " Overlapping milestones at the same chart position | " attributes " color=" colors["Axis"]
+      print "--" symbols["overlap"] " Overlapping or crowded milestones; exact events below | " attributes " color=" colors["Axis"]
       print "--Exact dates and times are in each conference menu | " attributes " color=" colors["Axis"]
     }
     ' "$OVERVIEW_FILE"

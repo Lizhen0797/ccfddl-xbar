@@ -26,13 +26,14 @@
       "label_width": 15,
       "font": "Menlo",
       "font_size": 11,
+      "marker_version": 3,
       "colors": {
-        "Submit": "#124D61,#9ADDEC",
-        "Review": "#394966,#CDD7EF",
-        "Rebuttal": "#6F4500,#FFD789",
-        "Notification": "#10583F,#96E6BB",
-        "Revision": "#5B357D,#DCBDF4",
-        "Camera Ready": "#3E5360,#C9DBE5",
+        "Submit": "#8A3D0A,#FFBD8A",
+        "Review": "#65358A,#DDBAF6",
+        "Rebuttal": "#705000,#F8D77C",
+        "Decision": "#10583F,#96E6BB",
+        "Revision": "#8A345A,#F4B4D3",
+        "Camera Ready": "#00616A,#91DFE5",
         "Conference": "#1B4A8D,#AECFFF",
         "Axis": "#45515D,#E0E5EB",
         "Default": "#45515D,#E0E5EB"
@@ -42,12 +43,24 @@
         "Full": "●",
         "Deadline": "△",
         "Review": "●",
-        "Rebuttal": "◇",
-        "Notification": "◆",
-        "Revision": "□",
+        "Early Reject": "△",
+        "Round Update": "○",
+        "Review Discussion": "□",
+        "Rebuttal": "◊",
+        "Rebuttal Start": "◇",
+        "Rebuttal End": "◆",
+        "Rebuttal Due": "△",
+        "Decision": "◉",
+        "Initial Decision": "◇",
+        "Final Decision": "◆",
+        "Revision Decision": "□",
+        "Revision": "◌",
+        "Minor Revision": "○",
+        "Major Revision": "□",
+        "Revision Due": "△",
         "Camera Ready": "●",
         "Conference": "●",
-        "Default": "●"
+        "Default": "?"
       },
       "symbols": {
         "line": "─",
@@ -660,12 +673,12 @@
         {
           "phase": "Feedback",
           "event": "Feedback Starts",
-          "datetime": "2026-10-19 00:00"
+          "datetime": "2026-10-24 00:00"
         },
         {
           "phase": "Feedback",
           "event": "Feedback Ends",
-          "datetime": "2026-10-25 23:59"
+          "datetime": "2026-10-31 23:59"
         },
         {
           "phase": "Decision",

@@ -136,12 +136,13 @@ the maximum axis width, font size, Submit color, and submission markers:
 "timeline": {
   "max_width": 200,
   "font_size": 12,
+  "marker_version": 3,
   "colors": {
-    "Submit": "#124D61,#9ADDEC"
+    "Submit": "#8A3D0A,#FFBD8A"
   },
   "markers": {
-    "Abstract": "○",
-    "Full": "●"
+    "Abstract": "◎",
+    "Full": "■"
   }
 }
 ```
@@ -154,22 +155,43 @@ the maximum axis width, font size, Submit color, and submission markers:
 | `font` | `"Menlo"` | Font family; use a monospaced font to preserve alignment. Names with spaces, such as `"SF Mono"`, are supported. |
 | `font_size` | `11` | Font size, an integer from 6 to 48. |
 | `colors` | Default light/dark palette | Map from phase/style names to `#RRGGBB` or `#light,#dark`. |
-| `markers` | Default phase markers | Map from milestone names to one ASCII, box-drawing, or supported geometric-symbol character. |
+| `marker_version` | `3` in new themes | Use `3` for explicit overrides. Untagged/`1` icon themes and `2` code themes upgrade known defaults to the colored-icon theme. |
+| `markers` | Geometric icons | Map from milestone names to one supported single-cell character; legacy/custom two-character ASCII alphanumeric codes are also accepted. |
 | `symbols.line` | `"─"` | Track/axis line character. |
 | `symbols.tick` | `"┬"` | Axis tick character. |
 | `symbols.overlap` | `"+"` | Marker used when multiple milestones share a track position. |
 
-Color keys are `Submit`, `Review`, `Rebuttal`, `Notification`, `Revision`,
+Color keys are `Submit`, `Review`, `Rebuttal`, `Decision`, `Revision`,
 `Camera Ready`, `Conference`, `Axis`, and `Default`. The `Submit` color applies
-to both the entire Submit track and its Abstract/Full/Deadline legend items.
-Marker keys are `Abstract`, `Full`, `Deadline`, `Review`, `Rebuttal`,
-`Notification`, `Revision`, `Camera Ready`, `Conference`, and `Default`.
+to both the entire Submit track and its grouped Abstract/Full/Deadline legend.
+Marker keys describe node types within those groups:
+
+- Submit: `Abstract`, `Full`, `Deadline`.
+- Review: `Review` (reviews/checkpoints), `Early Reject`, `Round Update`, `Review Discussion` (internal discussion).
+- Rebuttal: `Rebuttal Start`, `Rebuttal End`, `Rebuttal Due`.
+- Decision: `Initial Decision`, `Final Decision`, `Revision Decision`.
+- Revision: `Minor Revision`, `Major Revision`, `Revision Due`.
+- Final preparation and meeting: `Camera Ready`, `Conference`.
+
+`Rebuttal` and `Revision` also provide fallback markers for custom events without
+a known role; `Default` covers unknown groups. Legacy `colors.Notification` and
+`markers.Notification` are accepted as Decision aliases when their new keys are
+absent. Non-default legacy phase-marker overrides also apply to their node types
+unless an explicit node override is supplied. Themes with no `marker_version`
+or version `1` upgrade known old default shapes and colors; version `2` themes
+replace the v3.12 default letter codes and palette with colored icons. Only known
+defaults migrate; non-default customizations remain. This is a display-only
+migration: the plugin does not rewrite the configuration or visibility choices.
+In version `3`, all overrides are explicit, including an intentionally selected
+old color or code. A phase fallback does not replace its typed nodes. Keep each
+color/icon combination distinct to avoid reintroducing ambiguity.
 Custom phase keys can be added to either map; unknown phases use `Default`.
 Colors and symbols are applied consistently to tracks and the legend.
 
 The default palette retains the tested light/dark contrast. Supported geometric
-markers include `○●△▲▽▼◇◆□■◊◦◎◉◌`. Symbol overrides
-must be single-cell characters; whitespace, emoji, backslashes, and `|` are rejected to
+markers include `○●△▲▽▼◇◆□■◊◦◎◉◌`. Two-character marker
+codes accept only ASCII letters/digits. Track, tick, and overlap symbols must
+still be single-cell characters; whitespace, emoji, backslashes, and `|` are rejected to
 avoid breaking alignment or SwiftBar's parameter syntax. Width limits affect
 the chart layout, not its calendar-month window or the actual event times.
 
@@ -227,21 +249,81 @@ The visibility checklist and conference headings use `short_name`, such as `Neur
 
 Expand **Timeline Overview** for a horizontal, CCF Cycle-inspired timeline. All conferences checked in **Conference Visibility** share one date axis. A marker's horizontal position is proportional to its actual time between the current moment and the same local clock time one calendar month later. Past dates are not plotted, and selected conferences with no milestone in this window are omitted from the chart (they remain selected in **Conference Visibility**). If a conference has milestones in different display phases, it gets adjacent tracks on the same axis.
 
-The chart and workflow engine share a phase mapping; the original JSON phases and event names are unchanged. All submission milestones for a conference share one `Submit` track, while the marker and legend distinguish their event types:
+The chart and workflow engine share the B workflow classification: seven display
+groups, with typed event nodes inside each group. Each conference gets at most
+one track per group, not a separate track for every node type. Configured phase
+names and detailed event names remain available in the JSON and conference menus.
 
-| Configured phase or event | Track label | Marker / legend |
+| Configured phase or event | Track group | Node types in the legend |
 | --- | --- | --- |
-| `Submit` event named `Abstract` | Submit | `○` Abstract |
-| `Submit` event named `Paper` or `Full Paper` | Submit | `●` Full |
-| Other `Submit` events, such as Registration or Artifacts | Submit | `△` Deadline |
-| `Review` | Review | `●` Review |
-| `Response`, `Rebuttal`, `Discussion`, `Feedback`, or an event named for one of these windows | Rebuttal | `◇` Rebuttal |
-| `Decision` or an event named Notification/Decision/Results | Notification | `◆` Notification |
-| `Camera` | Camera Ready | `●` Camera Ready |
-| `Revision` or a revision event | Revision | `□` Revision |
-| `Waiting` | Conference | `●` Conference |
+| Abstract, Paper/Full Paper, Registration, Artifacts, and other `Submit` events | Submit | `○` Abstract, `●` Full, `△` Deadline |
+| Reviews Released, Early Reject, intermediate round notifications, and internal reviewer/AC discussion | Review | `●` Reviews, `△` Early Reject, `○` Round Update, `□` Discussion |
+| Author Response, Rebuttal, Discussion, Feedback, or Interactive windows | Rebuttal | `◇` Starts, `◆` Ends, `△` Due |
+| Initial Notification, Final Notification/Decision, Revision Notification/Decision | Decision | `◇` Initial, `◆` Final, `□` Revision Result |
+| Minor/Major Revision, revision deadlines, and shepherd approval | Revision | `○` Minor, `□` Major, `△` Due |
+| Camera Ready, Final Paper/Version, Direct Camera, or Revision Camera | Camera Ready | `●` Final Version |
+| `Waiting` / Conf / Conference | Conference | `●` Start |
 
-Outside the Submit phase, event names take precedence where they clarify a broad configured phase: for example, `Round 2 Notification` is shown as Notification even if its configured phase is Review, while `Reviews / Discussion Starts` is shown as Rebuttal. A later `Final Paper` under the Camera phase remains Camera Ready. The Submit row and its three legend items share the same teal-blue color, so the legend accurately matches the chart; `○`, `●`, and `△` distinguish Abstract, Full, and other submission deadlines. Other tracks use distinct phase colors. Each `color=light,dark` pair uses a darker hue on light menus and a pale hue on dark menus. SwiftBar colors an entire menu row, so separate colors for markers within one Submit row are not supported without inline ANSI formatting. The complete legend is below the chart. `+` means multiple milestones landed at the same position on one track. If macOS temporarily dims the entire menu, including uncolored text, a plugin palette cannot override that system-wide effect.
+Early Reject and intermediate round notifications are Review checkpoints, not
+final decisions. A generic Notification in the Decision phase is a Final node;
+explicit Initial and Revision names retain their respective node types. In this
+repository data, both NDSS cycles use `Early Reject Notification` in place of
+the former `Round 2 Notification` label for display consistency; the underlying
+dates have not changed.
+
+Author discussion belongs to Rebuttal, while internal reviewer/AC discussion
+belongs to Review. Internal/private or Reviewer-AC names are recognized; use the
+optional `audience` field for an ambiguous Discussion event. Combined names such
+as `Results / Rebuttal Starts` or `Early Reject / Response Starts` open the
+Rebuttal window and retain their full original name in the conference details.
+Revision tasks are distinguished from final-version tasks even when an older
+configuration stores both under Camera; for example, Minor Revision belongs to
+Revision, while Revision Camera belongs to Camera Ready.
+
+The complete legend remains below the chart, with one row per group:
+
+```text
+Submit       · ○ Abstract · ● Full · △ Deadline
+Review       · ● Reviews · △ Early Reject · ○ Round Update · □ Discussion
+Rebuttal     · ◇ Starts · ◆ Ends · △ Due
+Decision     · ◇ Initial · ◆ Final · □ Revision Result
+Revision     · ○ Minor · □ Major · △ Due
+Camera Ready · ● Final Version
+Conference   · ● Start
+```
+
+Color identifies the workflow group; icon shape identifies a node inside that
+group. Every default color/icon pair is distinct in both appearances: Full is
+an orange filled circle, while Reviews is a violet filled circle. No letter
+codes appear by default. Tracks and their grouped legend share the same color:
+
+| Group | Color family | Light / dark colors |
+| --- | --- | --- |
+| Submit | Orange | `#8A3D0A` / `#FFBD8A` |
+| Review | Violet | `#65358A` / `#DDBAF6` |
+| Rebuttal | Amber | `#705000` / `#F8D77C` |
+| Decision | Green | `#10583F` / `#96E6BB` |
+| Revision | Rose | `#8A345A` / `#F4B4D3` |
+| Camera Ready | Teal | `#00616A` / `#91DFE5` |
+| Conference | Blue | `#1B4A8D` / `#AECFFF` |
+
+The plugin uses [SwiftBar light/dark color pairs](https://swiftbar.github.io/SwiftBar/#parameters):
+dark hues on light menus and pale hues on dark menus. These defaults pass a
+4.5:1 contrast check against representative `#E9E9E9` / `#303030` backgrounds;
+actual translucent menu surfaces vary. Colors apply to the entire group row,
+without inline ANSI sequences. Shapes provide an additional cue, although
+users with color-vision deficiencies may prefer custom icons or full event names
+in the individual conference menus.
+
+Custom Rebuttal/Revision events without a recognized role add an inline Other
+entry (`◊`/`◌`) when present; unknown groups use `?` and get their own legend row.
+Default icons occupy exactly one chart cell. Custom two-cell codes remain
+supported; they are centered and clamped without shifting later events.
+The axis widens when needed to fit markers and date labels. `+` means milestones
+share a position or custom markers still collide at the width cap; whole markers
+collapse, never partially overwrite one another. Exact events remain in the
+individual conference menus. A plugin palette cannot override macOS temporarily
+dimming the entire menu, including uncolored text.
 
 Every plotted milestone position gets a tick and a computer-local date label above the axis. The axis grows just enough to keep date labels on one row, including a synthetic test with a milestone every day of a 31-day month. Its width is capped so an extremely clustered set of events cannot make the SwiftBar menu arbitrarily wide; only that exceptional case can require another date row. Labels normally show just the day number; if the same number occurs in two months within the window, both labels include the month (for example, `2/1` and `3/1`). The `Date` and `Axis` prefixes keep the scale aligned with the conference tracks in SwiftBar, which trims leading spaces. Open an individual conference below the chart for exact local timestamps and event names. Toggling a conference updates the chart after SwiftBar refreshes the plugin.
 
@@ -270,6 +352,7 @@ Each timeline event contains:
 - `datetime`: the local wall-clock time in the conference's configured time zone, formatted as `YYYY-MM-DD HH:MM`.
 - `timezone` (optional): an AoE, UTC, or IANA time-zone override for this event. When omitted, the event inherits the conference's `timezone`.
 - `kind` (optional): `start`, `end`, `deadline`, `notification`, or `milestone`. This makes the event's role explicit instead of inferring it from its English name.
+- `audience` (optional): `authors` or `reviewers`. Author discussion maps to Rebuttal; internal reviewer/AC discussion maps to Review. Use this to disambiguate a Discussion name; omitted values retain the legacy author-discussion interpretation unless an internal/private/Reviewer-AC name makes the audience clear.
 - `phase_after` (optional): the workflow stage to use after this event occurs. Use this override for a transition that cannot be inferred from ordinary milestones.
 
 Per-event time zones are useful when submission deadlines are AoE but the conference itself starts in the venue's local time zone:
@@ -295,7 +378,11 @@ With `show_phase_in_carousel` set to `false`, the menu-bar carousel shows only t
 
 ### Current Stage vs. Next Event
 
-`Current` is inferred from milestones that have already occurred, rather than copied from the next event. Response, Discussion, Feedback, Interactive, and Rebuttal windows are normalized to `Rebuttal`. Notifications are instantaneous checkpoints; they do not become a persistent `Notification` stage.
+`Current` is inferred from milestones that have already occurred, rather than
+copied from the next event's group. Author Response, Discussion, Feedback,
+Interactive, and Rebuttal windows are normalized to `Rebuttal`; internal
+reviewer/AC discussion remains `Review`. Early/round review updates and Decision
+notifications are instantaneous checkpoints, not persistent Current stages.
 
 | Position in the configured timeline | Current | Example next event |
 | --- | --- | --- |
@@ -303,12 +390,18 @@ With `show_phase_in_carousel` set to `false`, the menu-bar carousel shows only t
 | Last submission deadline passed; rebuttal has not started | Review | Response Starts |
 | Rebuttal start reached; its end is still ahead | Rebuttal | Response Ends |
 | Rebuttal ended; decision is still ahead | Review | Notification |
-| Notification reached; revision deadline follows | Revision | Revision Due |
-| Notification reached; camera-ready deadline follows | Camera Ready | Camera Ready |
+| Decision notification reached; revision deadline follows | Revision | Revision Due |
+| Decision notification reached; camera-ready deadline follows | Camera Ready | Camera Ready |
 | Final preparation completed; conference start is ahead | Waiting | Conf |
 | No future milestones remain | Finished | none |
 
-Stage transitions apply at the exact event timestamp: a start is active at that instant, while an end or deadline is already completed. An early/round notification or review release followed by further review/rebuttal activity keeps the current stage at `Review`. Consecutive response/discussion end milestones can represent one continuous normalized Rebuttal window; a later explicit start instead represents a separate window, with Review in between.
+Stage transitions apply at the exact event timestamp: a start is active at that
+instant, while an end or deadline is already completed. An early/round
+notification or review release keeps the current stage at `Review` and never
+implies that the user's paper was rejected. Consecutive author
+response/discussion end milestones can represent one continuous normalized
+Rebuttal window; a later explicit start instead represents a separate window,
+with Review in between.
 
 These are workflow inferences from the configured data, not knowledge of an organizer's submission system. Missing opening dates cannot be recovered from a deadline alone. Add explicit start events to describe exact windows, and use `kind` for non-English/custom event names. `phase_after` takes precedence over inferred transitions, for example:
 
@@ -323,6 +416,17 @@ These are workflow inferences from the configured data, not knowledge of an orga
 ```
 
 Existing configurations need no new fields. Without `kind`, names such as `Starts`, `Ends`, and `Due` plus the shared phase mapping determine the event role. Without `phase_after`, the normal workflow transitions apply. `Finished` means that the configured timeline has no future milestone; it does not infer an unrecorded conference end date.
+
+For example, an internal discussion can explicitly identify its audience:
+
+```json
+{
+  "phase": "Discussion",
+  "event": "Discussion Starts",
+  "datetime": "2027-03-22 00:00",
+  "audience": "reviewers"
+}
+```
 
 ### Local Time-Zone Conversion
 
@@ -427,7 +531,7 @@ bash -n ccf-ddl.1m.sh
 Run the timeline regression test. It uses a fixed clock and synthetic daily
 milestones across both 28- and 31-day months, checks that their labels fit on
 one row and every node survives, verifies the shared Submit track and its
-Abstract/Full/Deadline markers and legend, checks light/dark color contrast
+Abstract/Full/Deadline markers and phase-grouped legend, checks light/dark color contrast
 against representative menu backgrounds, and confirms that empty conference
 tracks are hidden:
 
@@ -452,6 +556,23 @@ legacy defaults, and unavailable/disabled caching:
 
 ```bash
 bash tests/test_cache_and_theme.sh
+```
+
+Run the B workflow regression test. It checks both NDSS labels, typed nodes in
+all seven groups, chart/legend color agreement, author versus internal
+discussion, checkpoint and decision transitions, distinct color/icon pairs,
+legacy icon/code-theme migration, and theme aliases:
+
+```bash
+bash tests/test_workflow_groups.sh
+```
+
+Check node-marker layout, including every typed/fallback icon, exact tick alignment,
+equal track widths, endpoint clipping, mixed one-/two-cell overrides, and crowded
+events at the width cap:
+
+```bash
+bash tests/test_node_markers.sh
 ```
 
 Tests use isolated temporary cache directories and do not write to the installed
